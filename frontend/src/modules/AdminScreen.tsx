@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { HardDrive, Users, AlertTriangle, UserCog } from "lucide-react";
+import { HardDrive, Users, AlertTriangle, UserCog, ListChecks } from "lucide-react";
 import { api } from "../api/client";
 import type { AppUser, KtvOption, ViPham } from "../types";
 import { loaiLoiLabel } from "../lib/format";
+import { StatusBadge } from "../components/StatusBadge";
 
 interface DriveStatus {
   connected: boolean;
@@ -22,6 +23,138 @@ const TRANG_THAI_LABEL: Record<AppUser["trang_thai_duyet"], { label: string; cls
   "Da duyet": { label: "Đã duyệt", cls: "tag-done" },
   "Tu choi": { label: "Từ chối", cls: "tag-pending" },
 };
+
+type ViPhamRowTatCa = ViPham & { ten_ktv_khop: string | null };
+
+const TRANG_THAI_OPTIONS = [
+  { value: "", label: "Tất cả trạng thái" },
+  { value: "chua-xu-ly", label: "Chưa xử lý" },
+  { value: "dang-cho-dong-bo", label: "Đang chờ đồng bộ" },
+  { value: "da-xu-ly", label: "Đã xử lý" },
+];
+
+// Muc Admin: xem TOAN BO vi pham he thong (khong loc theo nguoi dang nhap nhu man KTV) - thieu
+// phan nay Admin chi thay duoc hang doi "chua xac dinh KTV", khong co cach nao xem tong quan toan
+// he (xem phan hoi nguoi dung "admin co nhin thay toan bo khong?"). Khong cho click vao chi tiet vi
+// backend GET /giai-trinh/vi-pham/:id chi cho phep chinh chu KTV xem (403 neu Admin xem ho - dung y
+// thiet ke rieng tu, khong mo rong o day).
+function TatCaViPham({ ktvOptions }: { ktvOptions: KtvOption[] }) {
+  const [maKtv, setMaKtv] = useState("");
+  const [trangThai, setTrangThai] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<{ rows: ViPhamRowTatCa[]; total: number; pageSize: number } | null>(null);
+  const pageSize = 50;
+
+  function load() {
+    setData(null);
+    const qs = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      ...(maKtv ? { ma_ktv: maKtv } : {}),
+      ...(trangThai ? { trang_thai: trangThai } : {}),
+      ...(search.trim() ? { search: search.trim() } : {}),
+    });
+    api
+      .get<{ rows: ViPhamRowTatCa[]; total: number; pageSize: number }>(`/admin/vi-pham/tat-ca?${qs.toString()}`)
+      .then(setData)
+      .catch(() => setData({ rows: [], total: 0, pageSize }));
+  }
+
+  useEffect(load, [page, maKtv, trangThai]);
+
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 1;
+
+  return (
+    <div>
+      <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <ListChecks size={15} /> Tất cả vi phạm {data && <span className="badge">{data.total}</span>}
+      </div>
+      <div className="card">
+        <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+          <select
+            value={maKtv}
+            onChange={(e) => {
+              setPage(1);
+              setMaKtv(e.target.value);
+            }}
+          >
+            <option value="">Tất cả KTV</option>
+            {ktvOptions.map((k) => (
+              <option key={k.ma_ktv} value={k.ma_ktv}>
+                {k.ten_hien_thi ?? k.ma_ktv}
+              </option>
+            ))}
+          </select>
+          <select
+            value={trangThai}
+            onChange={(e) => {
+              setPage(1);
+              setTrangThai(e.target.value);
+            }}
+          >
+            {TRANG_THAI_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="Tìm case/khách hàng/seri..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (setPage(1), load())}
+            style={{ flex: 1, minWidth: 160 }}
+          />
+          <button className="btn btn-sm" onClick={() => (setPage(1), load())}>
+            Tìm
+          </button>
+        </div>
+
+        {data === null ? (
+          <div className="loading-state">Đang tải...</div>
+        ) : data.rows.length === 0 ? (
+          <div className="empty-state">Không tìm thấy vi phạm nào.</div>
+        ) : (
+          <>
+            {data.rows.map((vp) => (
+              <div key={vp.id} className="card" style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 700, marginBottom: 2 }}>#{vp.id}</div>
+                    <div className="card-title">{loaiLoiLabel(vp.loai_loi)}</div>
+                    <div className="card-meta" style={{ marginTop: 4 }}>
+                      {vp.case_id && <span>Case: {vp.case_id}</span>}
+                      <span>KTV: {vp.ten_ktv_khop ?? vp.ky_thuat_vien_ten ?? "(chưa xác định)"}</span>
+                      {vp.khu_vuc && <span>{vp.khu_vuc}</span>}
+                      {vp.khach_hang && <span>KH: {vp.khach_hang}</span>}
+                      <span>{vp.ngay_ghi_nhan}</span>
+                    </div>
+                  </div>
+                  <StatusBadge vp={vp} />
+                </div>
+              </div>
+            ))}
+            {totalPages > 1 && (
+              <div style={{ display: "flex", justifyContent: "center", gap: 10, alignItems: "center", marginTop: 10 }}>
+                <button className="btn btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                  Trước
+                </button>
+                <span className="card-meta">
+                  Trang {page}/{totalPages}
+                </span>
+                <button className="btn btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                  Sau
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Muc Admin: duyet/tu choi/khoa tai khoan - thieu phan nay thi tai khoan khong tu khop duoc KTV
 // (email dang nhap khac email_dang_nhap trong danh ba) ket "Cho duyet" vinh vien, khong ai xu ly
@@ -240,6 +373,7 @@ export function AdminScreen() {
         ))
       )}
 
+      <TatCaViPham ktvOptions={ktvOptions} />
       <QuanLyTaiKhoan />
     </div>
   );

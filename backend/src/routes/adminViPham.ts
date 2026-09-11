@@ -23,6 +23,56 @@ adminViPham.get("/vi-pham/ktv-options", async (c) => {
   return c.json({ rows: results });
 });
 
+// GET /vi-pham/tat-ca?ma_ktv=&trang_thai=chua-xu-ly|dang-cho-dong-bo|da-xu-ly&search=&page=&pageSize=
+// Toan bo vi pham he thong (khong loc theo nguoi dang nhap nhu GET /giai-trinh/vi-pham cua KTV) -
+// thieu route nay Admin chi thay duoc hang doi "chua xac dinh KTV", khong co cach nao xem tong quan
+// toan he (xem phan hoi nguoi dung "admin co nhin thay toan bo khong?"). Tra ten_hien_thi tu
+// ktv_lien_he (chuan hoa) thay vi ky_thuat_vien_ten tho tu DVBH khi da khop duoc KTV.
+adminViPham.get("/vi-pham/tat-ca", async (c) => {
+  const maKtv = c.req.query("ma_ktv")?.trim();
+  const trangThai = c.req.query("trang_thai")?.trim();
+  const search = c.req.query("search")?.trim();
+  const page = Math.max(1, Number(c.req.query("page")) || 1);
+  const pageSize = Math.min(200, Math.max(1, Number(c.req.query("pageSize")) || 50));
+  const offset = (page - 1) * pageSize;
+
+  const conditions: string[] = [];
+  const binds: unknown[] = [];
+
+  if (maKtv) {
+    conditions.push("vp.ky_thuat_vien_ma_ktv = ?");
+    binds.push(maKtv);
+  }
+  if (search) {
+    conditions.push("(LOWER(COALESCE(vp.case_id,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.khach_hang,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.seri_san_pham,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.ky_thuat_vien_ten,'')) LIKE LOWER(?))");
+    binds.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+  }
+  // 3 trang thai khop DUNG logic components/StatusBadge.tsx ben frontend (viPhamStatus()) - viet lai
+  // bang EXISTS truc tiep vi SQLite khong cho WHERE tham chieu alias cua chinh SELECT do.
+  const daGiaiTrinh = "EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id)";
+  const dangChoDongBo = "EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id AND gt.dong_bo_dvbh_luc IS NULL)";
+  if (trangThai === "chua-xu-ly") {
+    conditions.push(`NOT ${daGiaiTrinh} AND (vp.chot_bo_cap_2 IS NULL OR vp.chot_bo_cap_2 != 0)`);
+  } else if (trangThai === "dang-cho-dong-bo") {
+    conditions.push(`${daGiaiTrinh} AND ${dangChoDongBo}`);
+  } else if (trangThai === "da-xu-ly") {
+    conditions.push(`NOT (${daGiaiTrinh} AND ${dangChoDongBo}) AND NOT (NOT ${daGiaiTrinh} AND (vp.chot_bo_cap_2 IS NULL OR vp.chot_bo_cap_2 != 0))`);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const countRow = await c.env.DB.prepare(`SELECT COUNT(*) as total FROM vi_pham vp ${where}`).bind(...binds).first<{ total: number }>();
+  const { results } = await c.env.DB.prepare(
+    `SELECT vp.*, ktv.ten_hien_thi as ten_ktv_khop,
+            ${daGiaiTrinh} as da_giai_trinh, ${dangChoDongBo} as dang_cho_dong_bo
+     FROM vi_pham vp LEFT JOIN ktv_lien_he ktv ON ktv.ma_ktv = vp.ky_thuat_vien_ma_ktv
+     ${where} ORDER BY vp.nhan_luc DESC LIMIT ? OFFSET ?`,
+  )
+    .bind(...binds, pageSize, offset)
+    .all();
+
+  return c.json({ rows: results, page, pageSize, total: countRow?.total ?? 0 });
+});
+
 interface GanKtvBody {
   ma_ktv: string;
 }
