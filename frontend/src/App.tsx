@@ -24,7 +24,16 @@ function MainApp() {
 
   function refreshBadges() {
     api.get<{ chuaXuLy: number }>("/giai-trinh/vi-pham").then((r) => setViPhamBadge(r.chuaXuLy)).catch(() => {});
-    api.get<{ chuaDoc: number }>("/giai-trinh/thong-bao").then((r) => setThongBaoBadge(r.chuaDoc)).catch(() => {});
+    api
+      .get<{ chuaDoc: number }>("/giai-trinh/thong-bao")
+      .then((r) => {
+        setThongBaoBadge(r.chuaDoc);
+        // Icon PWA tren man hinh chinh (Badging API) - chi Chrome/Edge (desktop + Android) ho tro
+        // sau khi cai dat, KHONG co tren iOS Safari. Dung dung so "chua doc" giong chuong thong bao.
+        if (r.chuaDoc > 0) navigator.setAppBadge?.(r.chuaDoc).catch(() => {});
+        else navigator.clearAppBadge?.().catch(() => {});
+      })
+      .catch(() => {});
   }
 
   useEffect(refreshBadges, []);
@@ -77,6 +86,7 @@ function MainApp() {
             className="topbar-tab"
             style={{ display: "flex", alignItems: "center", gap: 6 }}
             onClick={async () => {
+              navigator.clearAppBadge?.().catch(() => {});
               await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
               window.location.href = "/";
             }}

@@ -9,12 +9,29 @@ self.addEventListener("push", (event) => {
     /* payload khong phai JSON - giu mac dinh */
   }
   event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      data: { url: payload.url || "/" },
-    }),
+    (async () => {
+      await self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        data: { url: payload.url || "/" },
+      });
+      // Cap nhat so tren icon PWA (Badging API) - app co the dang dong luc nhan push, nen phai tu
+      // hoi lai server so "chua doc" that (khong doan/tu tang) roi moi setAppBadge, tranh sai lech
+      // neu KTV da doc tren 1 thiet bi khac hoac nhieu push den lien tiep.
+      if ("setAppBadge" in navigator) {
+        try {
+          const res = await fetch("/api/giai-trinh/thong-bao", { credentials: "include" });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.chuaDoc > 0) await navigator.setAppBadge(data.chuaDoc);
+            else await navigator.clearAppBadge();
+          }
+        } catch {
+          /* offline/loi mang - bo qua, lan push/mo app sau se tu dong cap nhat lai */
+        }
+      }
+    })(),
   );
 });
 
