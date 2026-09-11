@@ -62,7 +62,9 @@ export interface CaseLookupResult {
 
 export async function lookupCase(env: Env, caseId: string): Promise<CaseLookupResult> {
   const base = (env.CASE_LOOKUP_BASE_URL || "https://dvbh.dichvu3t.workers.dev").replace(/\/$/, "");
-  const res = await fetch(`${base}/api/partner/case-lookup?id=${encodeURIComponent(caseId)}`, {
+  // Service Binding (env.DVBH_SERVICE) thay fetch() toan cuc - cung ly do loi 1042 nhu dvbhClient.ts
+  // (xac nhan that trong production 2026-09-11, xem ghi chu wrangler.jsonc).
+  const res = await env.DVBH_SERVICE.fetch(`${base}/api/partner/case-lookup?id=${encodeURIComponent(caseId)}`, {
     headers: { "X-API-Key": env.CASE_LOOKUP_API_KEY },
   });
   if (!res.ok) {

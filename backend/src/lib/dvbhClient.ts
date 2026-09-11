@@ -4,7 +4,8 @@ import { nowVN } from "./vnTime";
 // Gui ket qua giai trinh ve DVBH (PARTNER_API_GUIDE.md muc 9.2, "chieu 2" cua tich hop 2 chieu).
 // DVBH la SERVER co dinh (base URL that, khong doi theo moi truong) - dung hang so thay vi bien
 // env, khop dung danh sach "Vars thuong" trong ke hoach xay dung (khong co bien base-url rieng cho
-// DVBH). Dung fetch() THANG (khong Service Binding) - xem ghi chu rui ro trong wrangler.jsonc.
+// DVBH). Dung Service Binding (env.DVBH_SERVICE) thay fetch() toan cuc - xac nhan loi 1042 that
+// trong production 2026-09-11, xem ghi chu wrangler.jsonc.
 const DVBH_SYNC_URL = "https://dvbh.dichvu3t.workers.dev/api/partner/sync/giai-trinh-vi-pham";
 
 export interface GiaiTrinhSyncRow {
@@ -42,7 +43,7 @@ async function postBatch(env: Env, rows: GiaiTrinhSyncRow[]): Promise<{ ok: bool
 
   let res: Response;
   try {
-    res = await fetch(DVBH_SYNC_URL, {
+    res = await env.DVBH_SERVICE.fetch(DVBH_SYNC_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-API-Key": env.DVBH_SYNC_API_KEY },
       body: JSON.stringify(body),

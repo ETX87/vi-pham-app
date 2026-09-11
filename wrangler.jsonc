@@ -30,6 +30,11 @@
   // day sang (POST /api/partner/sync/ktv, routes/syncKtv.ts) qua cron cua CHINH no.
   "triggers": { "crons": ["0 * * * *"] },
 
+  // Them 2026-09-11: xac nhan loi 1042 that trong production (dong_bo_loi = "HTTP_404: error code:
+  // 1042" tren 1 giai trinh test) - dung Service Binding thay fetch() thang cho ca 2 huong goi ra
+  // DVBH (lib/dvbhClient.ts + lib/caseLookupClient.ts), dung ke hoach du phong da ghi san o duoi.
+  "services": [{ "binding": "DVBH_SERVICE", "service": "dvbh", "remote": true }],
+
   "vars": {
     "BOOTSTRAP_ADMIN_EMAIL": "smarttrade.vp@gmail.com",
     "GOOGLE_REDIRECT_URI": "https://vipham.dichvu3t.workers.dev/api/auth/callback",
@@ -54,11 +59,9 @@
   // hanh DVBH - KHAC key voi DVBH_SYNC_API_KEY, xem lib/caseLookupClient.ts), VAPID_SERVER_PRIVATE_KEY
   // (tu sinh moi).
   //
-  // LUU Y RUI RO (chi con anh huong chieu vi-pham-app -> DVBH, lib/dvbhClient.ts): app nay goi
-  // fetch() THANG toi URL cua DVBH (khong dung Service Binding) - neu 2 Worker cung 1 tai khoan
-  // Cloudflare, day co the bi chan boi loi 1042 (chong SSRF Worker-to-Worker) giong nhu linh-kien-app
-  // da gap voi CASE_LOOKUP_SERVICE (xem CLAUDE.md cua linh-kien-app). Neu gap loi nay khi deploy that,
-  // chuyen sang Service Binding (them "services" o day, doi lib/dvbhClient.ts dung env.<BINDING>.
-  // fetch() thay vi fetch() toan cuc). Chieu linh-kien-app -> vi-pham-app (danh ba KTV) KHONG co rui
-  // ro nay - linh-kien-app da dung Service Binding san (xem dvbhSyncClient.ts cua no).
+  // DA FIX 2026-09-11 (xem "services" o tren): ca lib/dvbhClient.ts va lib/caseLookupClient.ts truoc
+  // day goi fetch() THANG toi URL cua DVBH, bi chan boi loi 1042 (chong SSRF Worker-to-Worker cung
+  // tai khoan) - xac nhan that qua 1 giai trinh test bi ket "Dang cho dong bo" vinh vien. Ca 2 file
+  // gio dung env.DVBH_SERVICE.fetch() qua Service Binding, giong dvbhSyncClient.ts cua linh-kien-app
+  // da lam tu truoc.
 }

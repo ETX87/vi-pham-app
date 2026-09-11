@@ -25,6 +25,10 @@ export interface Env {
   // URIs cua CHINH Client do tren Google Cloud Console (khong tao Client moi).
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
+  // Them 2026-09-11: Service Binding toi Worker "dvbh" - dung cho ca lib/dvbhClient.ts (gui giai
+  // trinh) va lib/caseLookupClient.ts (tra cuu case), tranh loi 1042 (chong SSRF cung tai khoan
+  // Cloudflare) da xac nhan that trong production. Xem ghi chu wrangler.jsonc.
+  DVBH_SERVICE: Fetcher;
   SESSION_SECRET: string;
   // Xac thuc DVBH goi SANG (POST /api/nhan-vi-pham, xem lib/inboundAuth.ts) - 1 secret co dinh 1-1,
   // KHONG dung bang partner_api_keys nhieu-key nhu linh-kien-app (chi co dung 1 doi tac goi vao
