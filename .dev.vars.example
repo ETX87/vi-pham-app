@@ -1,0 +1,10 @@
+SESSION_SECRET=dev-only-local-testing-secret-change-me
+GOOGLE_CLIENT_ID=dev-placeholder-client-id
+GOOGLE_CLIENT_SECRET=dev-placeholder-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:8790/api/auth/callback
+FRONTEND_URL=http://localhost:8790
+KTV_SYNC_API_KEY=dev-placeholder-ktv-sync-key
+DVBH_INBOUND_API_KEY=dev-placeholder-inbound-key
+DVBH_SYNC_API_KEY=dev-placeholder-dvbh-sync-key
+CASE_LOOKUP_API_KEY=dev-placeholder-case-lookup-key
+LOCAL_DEV_BYPASS_AUTH=true

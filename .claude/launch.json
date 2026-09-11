@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "vipham-worker",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:worker"],
+      "port": 8790
+    },
+    {
+      "name": "vipham-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:frontend"],
+      "port": 5176,
+      "autoPort": true
+    }
+  ]
+}

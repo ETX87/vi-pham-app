@@ -1,0 +1,26 @@
+{
+  "name": "vi-pham-app",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:worker": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "deploy": "npm run build && npm run deploy --workspace backend",
+    "db:migrate:local": "npm run db:migrate:local --workspace backend",
+    "db:migrate:remote": "npm run db:migrate:remote --workspace backend"
+  },
+  "devDependencies": {
+    "wrangler": "^4.111.0",
+    "typescript": "^5.6.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "esbuild@0.21.5": true,
+    "workerd@1.20260910.1": true
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vipham",
+  "main": "backend/src/index.ts",
+  "compatibility_date": "2026-07-16",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // run_worker_first la BAT BUOC - thieu no thi request navigate that (Sec-Fetch-Mode: navigate) se
+  // bi Workers Static Assets SPA fallback chan truoc khi toi duoc Worker (hoc tu bai hoc load-bearing
+  // cua linh-kien-app CLAUDE.md). KHONG xoa dong nay.
+  "assets": {
+    "directory": "./frontend/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // database_id la PLACEHOLDER - dien sau khi chay "wrangler d1 create" that (xem DEPLOY.md buoc 2).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vi-pham-db",
+      "database_id": "475288b0-e59a-4d16-ba12-29b6fcf6b722",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Cron duy nhat: retry cac giai trinh chua dong bo duoc ve DVBH (xem backend/src/lib/dvbhClient.ts,
+  // index.ts scheduled()). Danh ba KTV KHONG nam trong cron nay - linh-kien-app moi la ben chu dong
+  // day sang (POST /api/partner/sync/ktv, routes/syncKtv.ts) qua cron cua CHINH no.
+  "triggers": { "crons": ["0 * * * *"] },
+
+  "vars": {
+    "BOOTSTRAP_ADMIN_EMAIL": "smarttrade.vp@gmail.com",
+    "GOOGLE_REDIRECT_URI": "https://vipham.dichvu3t.workers.dev/api/auth/callback",
+    "FRONTEND_URL": "https://vipham.dichvu3t.workers.dev",
+    // Tra cuu 1 case theo ID (GET /api/partner/case-lookup, PARTNER_API_GUIDE.md muc 1-7) - dung khi
+    // KTV mo 1 vi pham de xem chi tiet case goc. Base URL co dinh (giong DVBH_SYNC_URL trong
+    // lib/dvbhClient.ts) - chi CASE_LOOKUP_API_KEY moi la secret (xem duoi).
+    "CASE_LOOKUP_BASE_URL": "https://dvbh.dichvu3t.workers.dev",
+    // Web Push (xem backend/src/lib/webPush.ts) - VAPID_SERVER_PUBLIC_KEY KHONG nhay cam (khoa cong
+    // khai frontend can de subscribe), an toan de trong "vars". VAPID_SERVER_PRIVATE_KEY dat qua
+    // "wrangler secret put" (xem DEPLOY.md).
+    "VAPID_SUBJECT": "mailto:smarttrade.vp@gmail.com",
+    "VAPID_SERVER_PUBLIC_KEY": "BLg-hiMMgzbs-nlPru7RFMzfbKFsZUMQ4D4zYj4TnOGSe5aGteePNsZJlHLMln_FrmZ1EGPb__3psLZbRDPGmjU"
+  }
+
+  // Cac gia tri NHAY CAM (khong dat trong "vars" - dat qua "wrangler secret put", xem DEPLOY.md):
+  // GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (giong het linh-kien-app - dung chung 1 Google OAuth
+  // Client), SESSION_SECRET (moi, rieng), DVBH_INBOUND_API_KEY (tu sinh, dua cho van hanh DVBH),
+  // KTV_SYNC_API_KEY (TU SINH, dua cho nguoi van hanh linh-kien-app cau hinh lam secret
+  // VIPHAM_SYNC_API_KEY ben do - xac thuc POST /api/partner/sync/ktv goi VAO day, xem routes/
+  // syncKtv.ts), DVBH_SYNC_API_KEY (nhan tu van hanh DVBH), CASE_LOOKUP_API_KEY (nhan RIENG tu van
+  // hanh DVBH - KHAC key voi DVBH_SYNC_API_KEY, xem lib/caseLookupClient.ts), VAPID_SERVER_PRIVATE_KEY
+  // (tu sinh moi).
+  //
+  // LUU Y RUI RO (chi con anh huong chieu vi-pham-app -> DVBH, lib/dvbhClient.ts): app nay goi
+  // fetch() THANG toi URL cua DVBH (khong dung Service Binding) - neu 2 Worker cung 1 tai khoan
+  // Cloudflare, day co the bi chan boi loi 1042 (chong SSRF Worker-to-Worker) giong nhu linh-kien-app
+  // da gap voi CASE_LOOKUP_SERVICE (xem CLAUDE.md cua linh-kien-app). Neu gap loi nay khi deploy that,
+  // chuyen sang Service Binding (them "services" o day, doi lib/dvbhClient.ts dung env.<BINDING>.
+  // fetch() thay vi fetch() toan cuc). Chieu linh-kien-app -> vi-pham-app (danh ba KTV) KHONG co rui
+  // ro nay - linh-kien-app da dung Service Binding san (xem dvbhSyncClient.ts cua no).
+}
