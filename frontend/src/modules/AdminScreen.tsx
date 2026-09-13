@@ -46,7 +46,7 @@ function TatCaViPham({ ktvOptions }: { ktvOptions: KtvOption[] }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ rows: ViPhamRowTatCa[]; total: number; pageSize: number } | null>(null);
-  const pageSize = 50;
+  const pageSize = 10;
 
   function load() {
     setData(null);
