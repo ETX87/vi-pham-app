@@ -127,7 +127,7 @@ function TatCaViPham({ ktvOptions }: { ktvOptions: KtvOption[] }) {
                     <div className="card-title">{loaiLoiLabel(vp.loai_loi)}</div>
                     <div className="card-meta" style={{ marginTop: 4 }}>
                       {vp.case_id && <span>Case: {vp.case_id}</span>}
-                      <span>KTV: {vp.ten_ktv_khop ?? vp.ky_thuat_vien_ten ?? "(chưa xác định)"}</span>
+                      <span>KTV: {vp.ten_ktv_khop || vp.ky_thuat_vien_ten || "(chưa xác định)"}</span>
                       {vp.khu_vuc && <span>{vp.khu_vuc}</span>}
                       {vp.khach_hang && <span>KH: {vp.khach_hang}</span>}
                       <span>{vp.ngay_ghi_nhan}</span>
@@ -322,8 +322,11 @@ export function AdminScreen() {
         )}
       </div>
 
-      <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <Users size={15} /> Danh bạ KTV (linh-kien-app tự đẩy sang mỗi giờ)
+      <div className="section-title" style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 6 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Users size={15} /> Danh bạ KTV
+        </span>
+        <span style={{ fontWeight: 400, color: "var(--ink-400)", fontSize: 12 }}>(linh-kien-app tự đẩy sang mỗi giờ)</span>
       </div>
       <div className="card">
         <div className="card-meta">

@@ -81,7 +81,9 @@ function MainApp() {
             </button>
           )}
           <Avatar ten={user.ten} email={user.email} size={28} />
-          <span>{user.ten ?? user.email}</span>
+          <span className="topbar-user-name" title={user.ten ?? user.email}>
+            {user.ten ?? user.email}
+          </span>
           <button
             className="topbar-tab"
             style={{ display: "flex", alignItems: "center", gap: 6 }}

@@ -32,7 +32,7 @@ export function viPhamStatus(vp: ViPhamStatusInput): { label: string; cls: strin
 export function StatusBadge({ vp }: { vp: ViPhamStatusInput }) {
   const { label, cls } = viPhamStatus(vp);
   return (
-    <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+    <span style={{ display: "inline-flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 6, alignItems: "center", flexShrink: 0 }}>
       <span className={`status-badge ${cls}`}>{label}</span>
       {vp.dang_cho_dong_bo ? <span className="tag tag-syncing">Đang chờ đồng bộ</span> : null}
     </span>

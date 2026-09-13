@@ -17,6 +17,28 @@ function Field({ label, value }: { label: string; value: string | null | undefin
   );
 }
 
+interface FieldDef {
+  label: string;
+  value: string | null | undefined;
+}
+
+// 1 khoi = 1 nhom field lien quan (goi y nhom trong UI_SPEC.md muc 4.3) - AN CA KHOI (khong chi tung
+// o) neu khong co field nao trong nhom co gia tri, tranh hien tieu de khoi troi mot minh.
+function FieldGroup({ title, fields }: { title: string; fields: FieldDef[] }) {
+  const visible = fields.filter((f) => !!f.value);
+  if (visible.length === 0) return null;
+  return (
+    <div className="kv-group">
+      <div className="kv-group-title">{title}</div>
+      <div className="kv-grid">
+        {visible.map((f) => (
+          <Field key={f.label} label={f.label} value={f.value} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Man tra cuu thong tin GOC cua case tu DVBH (GET /api/partner/case-lookup, PARTNER_API_GUIDE.md muc
 // 1-7) - tu dong xin du lieu lan dau khi mo 1 vi pham co case_id, sau do chi doc cache tru khi nguoi
 // dung bam "Dong bo" (co rate-limit 2 lop, xem backend lib/caseLookupCache.ts).
@@ -89,40 +111,63 @@ export function CaseLookupPanel({ viPhamId }: { viPhamId: string }) {
         <div className="empty-state">{data && !data.found ? "Không tìm thấy case này bên DVBH." : "Chưa có dữ liệu."}</div>
       ) : (
         <>
-          <div className="kv-grid">
-            <Field label="KTV phụ trách" value={preview.ky_thuat_vien} />
-            <Field label="Khách hàng" value={preview.khach_hang} />
-            <Field label="Seri sản phẩm" value={preview.seri_san_pham} />
-            <Field label="Khu vực" value={preview.khu_vuc} />
-            <Field label="Tỉnh/thành" value={preview.tinh} />
-            <Field label="Quận/huyện" value={preview.quan_huyen} />
-            <Field label="Hãng" value={preview.hang} />
-            <Field label="Sản phẩm bảo hành" value={preview.san_pham_bao_hanh} />
-            <Field label="Nhóm sản phẩm" value={preview.nhom_san_pham} />
-            <Field label="Mô tả lỗi" value={preview.mo_ta_loi} />
-            <Field label="Nhóm yêu cầu" value={preview.nhom_yeu_cau} />
-            <Field label="Loại yêu cầu" value={preview.loai_yeu_cau} />
-            <Field label="Hình thức bảo hành" value={preview.hinh_thuc_bao_hanh} />
-            <Field label="Ngày mua" value={preview.ngay_mua} />
-            <Field label="Tiến độ hoàn thành" value={preview.tien_do_hoan_thanh} />
-            <Field label="CSKH tiếp nhận" value={preview.thoi_gian_cskh_tiep_nhan} />
-            <Field label="Hẹn xử lý" value={preview.thoi_gian_hen_xu_ly} />
-            <Field label="Hoàn thành" value={preview.thoi_gian_hoan_thanh} />
-            <Field label="Lý do quá hạn" value={preview.ly_do_qua_han} />
-            <Field label="Đối tác" value={preview.doi_tac} />
-            <Field label="Ngành hàng" value={preview.nganh} />
-            <Field label="Loại ngành hàng" value={preview.loai_nganh} />
-            <Field label="Nhóm khách hàng" value={preview.nhom_kh} />
-            <Field label="Cách thức xử lý" value={preview.cach_thuc_xu_ly} />
-            <Field label="Đúng/trễ hạn" value={preview.dung_han} />
-            <Field label="Nhóm xử lý 24h" value={preview.xu_ly_24h_bucket} />
-            <Field label="Lý do hủy case" value={preview.ly_do_huy} />
-            <Field label="Ngày import" value={preview.ngay_import} />
-            <Field label="Cập nhật gần nhất" value={preview.ngay_cap_nhat_gan_nhat} />
-            <Field label="Định giá sản phẩm" value={formatTien(preview.dt_san_pham)} />
-            <Field label="Định giá linh kiện" value={formatTien(preview.dt_linh_kien)} />
-            <Field label="Định giá dịch vụ" value={formatTien(preview.dt_dich_vu)} />
-          </div>
+          <FieldGroup
+            title="KTV & khách hàng"
+            fields={[
+              { label: "KTV phụ trách", value: preview.ky_thuat_vien },
+              { label: "Khách hàng", value: preview.khach_hang },
+              { label: "Seri sản phẩm", value: preview.seri_san_pham },
+              { label: "Khu vực", value: preview.khu_vuc },
+              { label: "Tỉnh/thành", value: preview.tinh },
+              { label: "Quận/huyện", value: preview.quan_huyen },
+            ]}
+          />
+          <FieldGroup
+            title="Sản phẩm & yêu cầu"
+            fields={[
+              { label: "Hãng", value: preview.hang },
+              { label: "Sản phẩm bảo hành", value: preview.san_pham_bao_hanh },
+              { label: "Nhóm sản phẩm", value: preview.nhom_san_pham },
+              { label: "Mô tả lỗi", value: preview.mo_ta_loi },
+              { label: "Nhóm yêu cầu", value: preview.nhom_yeu_cau },
+              { label: "Loại yêu cầu", value: preview.loai_yeu_cau },
+              { label: "Hình thức bảo hành", value: preview.hinh_thuc_bao_hanh },
+              { label: "Ngày mua", value: preview.ngay_mua },
+            ]}
+          />
+          <FieldGroup
+            title="Tiến độ xử lý"
+            fields={[
+              { label: "Tiến độ hoàn thành", value: preview.tien_do_hoan_thanh },
+              { label: "CSKH tiếp nhận", value: preview.thoi_gian_cskh_tiep_nhan },
+              { label: "Hẹn xử lý", value: preview.thoi_gian_hen_xu_ly },
+              { label: "Hoàn thành", value: preview.thoi_gian_hoan_thanh },
+              { label: "Lý do quá hạn", value: preview.ly_do_qua_han },
+              { label: "Đúng/trễ hạn", value: preview.dung_han },
+              { label: "Nhóm xử lý 24h", value: preview.xu_ly_24h_bucket },
+              { label: "Lý do hủy case", value: preview.ly_do_huy },
+              { label: "Ngày import", value: preview.ngay_import },
+              { label: "Cập nhật gần nhất", value: preview.ngay_cap_nhat_gan_nhat },
+            ]}
+          />
+          <FieldGroup
+            title="Nghiệp vụ / tổ chức"
+            fields={[
+              { label: "Đối tác", value: preview.doi_tac },
+              { label: "Ngành hàng", value: preview.nganh },
+              { label: "Loại ngành hàng", value: preview.loai_nganh },
+              { label: "Nhóm khách hàng", value: preview.nhom_kh },
+              { label: "Cách thức xử lý", value: preview.cach_thuc_xu_ly },
+            ]}
+          />
+          <FieldGroup
+            title="Định giá"
+            fields={[
+              { label: "Định giá sản phẩm", value: formatTien(preview.dt_san_pham) },
+              { label: "Định giá linh kiện", value: formatTien(preview.dt_linh_kien) },
+              { label: "Định giá dịch vụ", value: formatTien(preview.dt_dich_vu) },
+            ]}
+          />
 
           {preview.noi_dung_xu_ly && (
             <div style={{ marginTop: 10 }}>
@@ -136,7 +181,7 @@ export function CaseLookupPanel({ viPhamId }: { viPhamId: string }) {
               <div style={{ fontSize: 14, marginTop: 2 }}>{preview.luu_y_loi_linh_kien}</div>
             </div>
           )}
-          {preview.link_hinh_anh.length > 0 && (
+          {(preview.link_hinh_anh?.length ?? 0) > 0 && (
             <div style={{ marginTop: 10 }}>
               <div className="kv-label" style={{ marginBottom: 6 }}>
                 Ảnh báo cáo công việc (KTV đã upload)
@@ -156,7 +201,7 @@ export function CaseLookupPanel({ viPhamId }: { viPhamId: string }) {
             </a>
           )}
 
-          {data.giaiTrinh.length > 0 && (
+          {(data.giaiTrinh?.length ?? 0) > 0 && (
             <div className="giai-trinh-box">
               <div className="section-title" style={{ marginTop: 0 }}>
                 Lịch sử giải trình chậm (case này)
