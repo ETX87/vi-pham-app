@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, BellOff, LogOut } from "lucide-react";
 import { useAuth } from "./auth/AuthContext";
 import { Avatar } from "./components/Avatar";
@@ -37,6 +37,41 @@ function MainApp() {
   }
 
   useEffect(refreshBadges, []);
+
+  // Nut/cu chi Back cua Android tren PWA da cai dat = history.back() cua trinh duyet - khong co
+  // routing (chi dung useState cho tab/selectedId) nen mac dinh KHONG co history entry nao de lui,
+  // Back se thoat luon app tu bat ky man hinh nao. Fix: coi "Vi pham cua toi" (tab mac dinh, chua
+  // chon vi pham nao) la man chinh - roi khoi day thi push 1 entry gia; Back se duoc bat (popstate)
+  // va dua ve man chinh thay vi thoat app. Chi khi dang o man chinh, Back moi thoat app (hanh vi
+  // trinh duyet mac dinh, khong can can thiep).
+  const pushedHistoryRef = useRef(false);
+  const isHome = tab === "vi-pham" && !selectedId;
+
+  useEffect(() => {
+    if (!isHome && !pushedHistoryRef.current) {
+      window.history.pushState({ vipham: true }, "");
+      pushedHistoryRef.current = true;
+    } else if (isHome && pushedHistoryRef.current) {
+      // Quay ve man chinh qua thao tac trong app (bam nut back UI, doi tab...), khong phai qua
+      // Back cua Android - tu tieu thu entry gia da push de Back lan sau tu man chinh thoat app
+      // dung, khong bi ket 1 entry "ao" con sot lai.
+      pushedHistoryRef.current = false;
+      window.history.back();
+    }
+  }, [isHome]);
+
+  useEffect(() => {
+    function onPopState() {
+      if (pushedHistoryRef.current) {
+        pushedHistoryRef.current = false;
+        setTab("vi-pham");
+        setSelectedId(null);
+      }
+      // Khong con entry gia (dang o man chinh) - de trinh duyet/PWA tu xu ly Back (thoat app).
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   if (state.status !== "authenticated") return null;
   const { user } = state;
