@@ -208,13 +208,28 @@ giaiTrinh.post("/vi-pham/:id/giai-trinh", async (c) => {
   return c.json({ ok: true, id: giaiTrinhId, dongBoThanhCong: syncResult.ok });
 });
 
-// GET /thong-bao - danh sach thong bao trong-app cua CHINH nguoi dang dang nhap (moi nhat truoc,
-// toi da 50 dong) - dung cho chuong NotificationBell don gian o frontend. "chuaDoc" de hien badge.
+const THONG_BAO_PAGE_SIZE = 10;
+
+// GET /thong-bao?trang_thai=chua_doc|da_doc&page=1 - danh sach thong bao trong-app cua CHINH nguoi
+// dang dang nhap, phan trang 10 dong/lan (infinite-scroll o frontend - xem NotificationsScreen.tsx)
+// de tranh tai het 1 luc ton doc D1. "trang_thai" bo trong = tat ca. "chuaDoc" luon tinh TREN TOAN
+// BO (khong theo filter/page dang xem) de hien badge dung. Fetch du LIMIT+1 dong de biet "hasMore"
+// ma khong can them 1 cau COUNT(*) rieng (do dat 1 read D1).
 giaiTrinh.get("/thong-bao", async (c) => {
   const user = c.get("user");
-  const { results } = await c.env.DB.prepare("SELECT * FROM thong_bao WHERE nguoi_nhan = ? ORDER BY ngay_tao DESC LIMIT 50").bind(user.email).all();
+  const trangThai = c.req.query("trang_thai");
+  const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10) || 1);
+  const offset = (page - 1) * THONG_BAO_PAGE_SIZE;
+
+  const dieuKienDoc = trangThai === "chua_doc" ? " AND da_doc = 0" : trangThai === "da_doc" ? " AND da_doc = 1" : "";
+  const { results } = await c.env.DB.prepare(`SELECT * FROM thong_bao WHERE nguoi_nhan = ?${dieuKienDoc} ORDER BY ngay_tao DESC, id DESC LIMIT ? OFFSET ?`)
+    .bind(user.email, THONG_BAO_PAGE_SIZE + 1, offset)
+    .all();
+  const hasMore = results.length > THONG_BAO_PAGE_SIZE;
+  const rows = hasMore ? results.slice(0, THONG_BAO_PAGE_SIZE) : results;
+
   const chuaDocRow = await c.env.DB.prepare("SELECT COUNT(*) as cnt FROM thong_bao WHERE nguoi_nhan = ? AND da_doc = 0").bind(user.email).first<{ cnt: number }>();
-  return c.json({ rows: results, chuaDoc: chuaDocRow?.cnt ?? 0 });
+  return c.json({ rows, chuaDoc: chuaDocRow?.cnt ?? 0, hasMore });
 });
 
 // POST /thong-bao/:id/danh-dau-da-doc - danh dau 1 thong bao la da doc (chi cho phep tren thong
@@ -223,6 +238,14 @@ giaiTrinh.post("/thong-bao/:id/danh-dau-da-doc", async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE thong_bao SET da_doc = 1 WHERE id = ? AND nguoi_nhan = ?").bind(id, user.email).run();
+  return c.json({ ok: true });
+});
+
+// POST /thong-bao/danh-dau-tat-ca-da-doc - danh dau TOAN BO thong bao chua doc cua CHINH minh la
+// da doc (nut "Đánh dấu tất cả đã đọc" o frontend).
+giaiTrinh.post("/thong-bao/danh-dau-tat-ca-da-doc", async (c) => {
+  const user = c.get("user");
+  await c.env.DB.prepare("UPDATE thong_bao SET da_doc = 1 WHERE nguoi_nhan = ? AND da_doc = 0").bind(user.email).run();
   return c.json({ ok: true });
 });
 

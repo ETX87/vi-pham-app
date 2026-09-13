@@ -107,6 +107,10 @@ body {
   cursor: pointer;
 }
 .topbar-tab.active { background: white; color: var(--brand-700); font-weight: 700; }
+
+.pill-tabs { display: flex; gap: 6px; }
+.pill-tab { background: var(--card); border: 1px solid var(--line); color: var(--ink-600); padding: 6px 14px; border-radius: 999px; font-size: 13px; cursor: pointer; }
+.pill-tab.active { background: var(--brand-700); color: white; border-color: var(--brand-700); font-weight: 700; }
 .main { flex: 1; padding: 20px; max-width: 980px; margin: 0 auto; width: 100%; }
 .narrow { max-width: 640px; margin: 0 auto; }
 
