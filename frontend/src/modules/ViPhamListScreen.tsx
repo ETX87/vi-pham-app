@@ -137,6 +137,7 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
                       )}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+                      {vp.case_id && <span style={{ fontSize: 13, fontWeight: 800, color: "var(--brand-700)" }}>#{vp.case_id}</span>}
                       <StatusBadge vp={vp} />
                       <ChevronRight size={18} color="var(--ink-400)" />
                     </div>
