@@ -47,9 +47,14 @@ export async function sendPushToUser(env: Env, nguoiDung: string, payload: PushP
         // luy subscription chet.
         if (res.status === 404 || res.status === 410) {
           await env.DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(row.id).run();
+        } else if (!res.ok) {
+          // Log de chan doan (vd 401/403 sai VAPID key, 400 payload/ttl khong hop le) - truoc day
+          // nuot am tham nen khong the biet vi sao 1 nguoi da subscribe nhung khong nhan duoc push.
+          console.error(`sendPushToUser: push service tra ${res.status} cho subscription id=${row.id}`, await res.text().catch(() => ""));
         }
-      } catch {
-        // Khong lam hong luong chinh chi vi 1 lan gui push that bai mang.
+      } catch (err) {
+        // Khong lam hong luong chinh chi vi 1 lan gui push that bai mang, nhung van log de chan doan.
+        console.error(`sendPushToUser: loi khi gui push cho subscription id=${row.id}`, err);
       }
     }),
   );
