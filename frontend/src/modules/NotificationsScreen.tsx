@@ -24,7 +24,7 @@ const FILTER_OPTIONS: { value: TrangThai; label: string }[] = [
 ];
 
 export function NotificationsScreen({ onSelectViPham, onChanged }: { onSelectViPham: (id: string) => void; onChanged?: () => void }) {
-  const [trangThai, setTrangThai] = useState<TrangThai>("");
+  const [trangThai, setTrangThai] = useState<TrangThai>("chua_doc");
   const [rows, setRows] = useState<ThongBao[]>([]);
   const [chuaDoc, setChuaDoc] = useState(0);
   const [page, setPage] = useState(1);
