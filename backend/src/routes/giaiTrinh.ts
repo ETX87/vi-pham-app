@@ -53,7 +53,7 @@ giaiTrinh.get("/vi-pham", async (c) => {
     `SELECT vp.*,
             EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id) as da_giai_trinh,
             EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id AND gt.dong_bo_dvbh_luc IS NULL) as dang_cho_dong_bo
-     FROM vi_pham vp WHERE vp.ky_thuat_vien_ma_ktv = ? ORDER BY vp.nhan_luc DESC`,
+     FROM vi_pham vp WHERE vp.ky_thuat_vien_ma_ktv = ? ORDER BY vp.ngay_ghi_nhan DESC`,
   )
     .bind(maKtv)
     .all<ViPhamRow>();
