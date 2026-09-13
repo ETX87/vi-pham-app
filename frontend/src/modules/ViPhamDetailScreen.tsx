@@ -191,8 +191,8 @@ export function ViPhamDetailScreen({ id, onBack, onChanged }: { id: string; onBa
   // ---------- Man xem chi tiet ----------
   return (
     <div className="narrow">
-      <div className="detail-header" style={{ justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div className="detail-header" style={{ justifyContent: "space-between", flexWrap: "wrap", rowGap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <button className="detail-back" onClick={onBack}>
             <ArrowLeft size={20} />
           </button>

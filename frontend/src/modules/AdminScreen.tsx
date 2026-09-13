@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type { AppUser, KtvOption, ViPham } from "../types";
 import { loaiLoiLabel } from "../lib/format";
 import { StatusBadge } from "../components/StatusBadge";
+import { KtvCombobox } from "../components/KtvCombobox";
 
 interface DriveStatus {
   connected: boolean;
@@ -73,20 +74,16 @@ function TatCaViPham({ ktvOptions }: { ktvOptions: KtvOption[] }) {
       </div>
       <div className="card">
         <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-          <select
+          <KtvCombobox
             value={maKtv}
-            onChange={(e) => {
+            onChange={(v) => {
               setPage(1);
-              setMaKtv(e.target.value);
+              setMaKtv(v);
             }}
-          >
-            <option value="">Tất cả KTV</option>
-            {ktvOptions.map((k) => (
-              <option key={k.ma_ktv} value={k.ma_ktv}>
-                {k.ten_hien_thi ?? k.ma_ktv}
-              </option>
-            ))}
-          </select>
+            options={ktvOptions}
+            allLabel="Tất cả KTV"
+            containerStyle={{ flex: "1 1 200px" }}
+          />
           <select
             value={trangThai}
             onChange={(e) => {
@@ -357,19 +354,20 @@ export function AdminScreen() {
               <span>Tên KTV (thô từ DVBH): {vp.ky_thuat_vien_ten || "(trống)"}</span>
               <span>Ghi nhận: {vp.ngay_ghi_nhan}</span>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <select
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <KtvCombobox
                 value={assigning[vp.id] ?? ""}
-                onChange={(e) => setAssigning((prev) => ({ ...prev, [vp.id]: e.target.value }))}
+                onChange={(v) => setAssigning((prev) => ({ ...prev, [vp.id]: v }))}
+                options={ktvOptions}
+                placeholder="-- Chọn KTV --"
+                containerStyle={{ flex: "1 1 200px" }}
+              />
+              <button
+                className="btn btn-primary btn-sm"
+                style={{ flexShrink: 0 }}
+                disabled={!assigning[vp.id] || savingId === vp.id}
+                onClick={() => handleAssign(vp.id)}
               >
-                <option value="">-- Chọn KTV --</option>
-                {ktvOptions.map((k) => (
-                  <option key={k.ma_ktv} value={k.ma_ktv}>
-                    {k.ten_hien_thi ?? k.ma_ktv} ({k.ma_ktv})
-                  </option>
-                ))}
-              </select>
-              <button className="btn btn-primary btn-sm" disabled={!assigning[vp.id] || savingId === vp.id} onClick={() => handleAssign(vp.id)}>
                 {savingId === vp.id ? "Đang lưu..." : "Gán"}
               </button>
             </div>
