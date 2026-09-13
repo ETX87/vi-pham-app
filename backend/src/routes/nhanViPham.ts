@@ -170,6 +170,12 @@ async function handleGiamSatGiaiTrinh(c: Context<{ Bindings: Env }>, body: GiamS
   if (!viPham) return { ok: true };
 
   const anhUrls = (body.anh_urls ?? []).slice(0, 5);
+  // vi_pham_giai_trinh.nguoi_giai_trinh la NOT NULL (0001_init.sql) nhung ben DVBH truong nay la
+  // optional (routes/viPham.ts POST /:id/giai-trinh) - GS co the bo trong. Fallback placeholder de
+  // tranh loi constraint (bug thuc te 2026-09-13: case 1322764, INSERT nem loi -> 500 -> DVBH khong
+  // retry -> giai trinh cua GS khong bao gio toi duoc app nay). Khong hien thi truong nay o UI
+  // (ViPhamDetailScreen.tsx) nen placeholder khong anh huong gi.
+  const nguoiGiaiTrinh = body.nguoi_giai_trinh?.trim() || "Giam sat (DVBH)";
   // dong_bo_dvbh_luc = nowVN() NGAY LUC INSERT (khac han dong KTV tu nop qua POST .../giai-trinh,
   // luon bat dau NULL roi moi thu dong bo) - vi du lieu nay goc DA O SAN trong DVBH roi, KHONG can
   // gui nguoc lai (tranh cron retryPendingGiaiTrinh() hieu nham day la dong "chua dong bo" va gui
@@ -178,7 +184,7 @@ async function handleGiamSatGiaiTrinh(c: Context<{ Bindings: Env }>, body: GiamS
     `INSERT INTO vi_pham_giai_trinh (id, vi_pham_id, nguoi_giai_trinh, ngay_giai_trinh, noi_dung_giai_trinh, ghi_chu, anh_urls, tao_luc, dong_bo_dvbh_luc, nguon)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'giam_sat_dvbh')`,
   )
-    .bind(crypto.randomUUID(), body.vi_pham_id, body.nguoi_giai_trinh ?? null, body.ngay_giai_trinh, body.noi_dung_giai_trinh ?? null, body.ghi_chu ?? null, JSON.stringify(anhUrls), nowVN(), nowVN())
+    .bind(crypto.randomUUID(), body.vi_pham_id, nguoiGiaiTrinh, body.ngay_giai_trinh, body.noi_dung_giai_trinh ?? null, body.ghi_chu ?? null, JSON.stringify(anhUrls), nowVN(), nowVN())
     .run();
 
   c.executionCtx.waitUntil(
