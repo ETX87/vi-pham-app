@@ -135,7 +135,7 @@ body {
 .card-clickable { cursor: pointer; }
 .card-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
 .card-meta { font-size: 13px; color: var(--ink-600); display: flex; flex-wrap: wrap; gap: 4px 14px; }
-.card-meta span { white-space: nowrap; }
+.card-meta span { white-space: nowrap; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 
 .tag {
   display: inline-block;
