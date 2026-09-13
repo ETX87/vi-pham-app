@@ -268,33 +268,74 @@ export function AdminScreen() {
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null);
   const [ktvStatus, setKtvStatus] = useState<KtvDirectoryStatus | null>(null);
 
+  const CHUA_XAC_DINH_PAGE_SIZE = 10;
   const [chuaXacDinh, setChuaXacDinh] = useState<ViPham[] | null>(null);
+  const [chuaXacDinhTotal, setChuaXacDinhTotal] = useState(0);
+  const [chuaXacDinhPage, setChuaXacDinhPage] = useState(1);
   const [ktvOptions, setKtvOptions] = useState<KtvOption[]>([]);
   const [assigning, setAssigning] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [ignoringId, setIgnoringId] = useState<string | null>(null);
 
-  function loadAll() {
-    api.get<DriveStatus>("/settings/google-drive/status").then(setDriveStatus).catch(() => setDriveStatus({ connected: false }));
-    api.get<KtvDirectoryStatus>("/settings/ktv-lien-he-status").then(setKtvStatus).catch(() => {});
-    api.get<{ rows: ViPham[] }>("/admin/vi-pham/chua-xac-dinh").then((r) => setChuaXacDinh(r.rows)).catch(() => setChuaXacDinh([]));
-    api.get<{ rows: KtvOption[] }>("/admin/vi-pham/ktv-options").then((r) => setKtvOptions(r.rows)).catch(() => {});
+  function loadChuaXacDinh() {
+    setChuaXacDinh(null);
+    api
+      .get<{ rows: ViPham[]; total: number }>(`/admin/vi-pham/chua-xac-dinh?page=${chuaXacDinhPage}`)
+      .then((r) => {
+        setChuaXacDinh(r.rows);
+        setChuaXacDinhTotal(r.total);
+      })
+      .catch(() => {
+        setChuaXacDinh([]);
+        setChuaXacDinhTotal(0);
+      });
   }
 
-  useEffect(loadAll, []);
+  useEffect(() => {
+    api.get<DriveStatus>("/settings/google-drive/status").then(setDriveStatus).catch(() => setDriveStatus({ connected: false }));
+    api.get<KtvDirectoryStatus>("/settings/ktv-lien-he-status").then(setKtvStatus).catch(() => {});
+    api.get<{ rows: KtvOption[] }>("/admin/vi-pham/ktv-options").then((r) => setKtvOptions(r.rows)).catch(() => {});
+  }, []);
+
+  useEffect(loadChuaXacDinh, [chuaXacDinhPage]);
+
+  // Sau khi gan/bo qua lam mat 1 (hoac nhieu, vd gan hang loat) dong khoi trang dang xem - neu trang
+  // hien tai het sach VA khong phai trang 1 thi lui ve trang truoc (effect o tren se tu tai lai), con
+  // lai thi tai lai CHINH trang dang xem (tong so + cac dong con lai co the da doi).
+  function refreshChuaXacDinhSauThayDoi(soDongMat: number) {
+    const conLaiTrenTrang = (chuaXacDinh?.length ?? 0) - soDongMat;
+    if (conLaiTrenTrang <= 0 && chuaXacDinhPage > 1) setChuaXacDinhPage((p) => p - 1);
+    else loadChuaXacDinh();
+  }
 
   async function handleAssign(viPhamId: string) {
     const maKtv = assigning[viPhamId];
     if (!maKtv) return;
     setSavingId(viPhamId);
     try {
-      await api.patch(`/admin/vi-pham/${viPhamId}/gan-ktv`, { ma_ktv: maKtv });
-      setChuaXacDinh((prev) => (prev ? prev.filter((v) => v.id !== viPhamId) : prev));
+      const res = await api.patch<{ ok: boolean; soLuongDaGan: number }>(`/admin/vi-pham/${viPhamId}/gan-ktv`, { ma_ktv: maKtv });
+      if (res.soLuongDaGan > 1) alert(`Đã tự động gán ${res.soLuongDaGan} vi phạm cùng tên KTV này.`);
+      refreshChuaXacDinhSauThayDoi(res.soLuongDaGan);
     } catch {
       alert("Gán KTV thất bại - vui lòng thử lại.");
     } finally {
       setSavingId(null);
     }
   }
+
+  async function handleIgnore(viPhamId: string) {
+    setIgnoringId(viPhamId);
+    try {
+      await api.patch(`/admin/vi-pham/${viPhamId}/bo-qua-gan-ktv`);
+      refreshChuaXacDinhSauThayDoi(1);
+    } catch {
+      alert("Bỏ qua thất bại - vui lòng thử lại.");
+    } finally {
+      setIgnoringId(null);
+    }
+  }
+
+  const chuaXacDinhTotalPages = Math.max(1, Math.ceil(chuaXacDinhTotal / CHUA_XAC_DINH_PAGE_SIZE));
 
   return (
     <div className="narrow">
@@ -339,40 +380,58 @@ export function AdminScreen() {
       </div>
 
       <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <AlertTriangle size={15} /> Chưa xác định KTV {chuaXacDinh && chuaXacDinh.length > 0 && <span className="badge">{chuaXacDinh.length}</span>}
+        <AlertTriangle size={15} /> Chưa xác định KTV {chuaXacDinhTotal > 0 && <span className="badge">{chuaXacDinhTotal}</span>}
       </div>
       {chuaXacDinh === null ? (
         <div className="loading-state">Đang tải...</div>
       ) : chuaXacDinh.length === 0 ? (
         <div className="empty-state">Không có vi phạm nào đang chờ gán KTV.</div>
       ) : (
-        chuaXacDinh.map((vp) => (
-          <div key={vp.id} className="card">
-            <div className="card-title">{loaiLoiLabel(vp.loai_loi)}</div>
-            <div className="card-meta" style={{ marginBottom: 10 }}>
-              {vp.case_id && <span>Case: {vp.case_id}</span>}
-              <span>Tên KTV (thô từ DVBH): {vp.ky_thuat_vien_ten || "(trống)"}</span>
-              <span>Ghi nhận: {vp.ngay_ghi_nhan}</span>
+        <>
+          {chuaXacDinh.map((vp) => (
+            <div key={vp.id} className="card">
+              <div className="card-title">{loaiLoiLabel(vp.loai_loi)}</div>
+              <div className="card-meta" style={{ marginBottom: 10 }}>
+                {vp.case_id && <span>Case: {vp.case_id}</span>}
+                <span>Tên KTV (thô từ DVBH): {vp.ky_thuat_vien_ten || "(trống)"}</span>
+                <span>Ghi nhận: {vp.ngay_ghi_nhan}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <KtvCombobox
+                  value={assigning[vp.id] ?? ""}
+                  onChange={(v) => setAssigning((prev) => ({ ...prev, [vp.id]: v }))}
+                  options={ktvOptions}
+                  placeholder="-- Chọn KTV --"
+                  containerStyle={{ flex: "1 1 200px" }}
+                />
+                <button
+                  className="btn btn-primary btn-sm"
+                  style={{ flexShrink: 0 }}
+                  disabled={!assigning[vp.id] || savingId === vp.id}
+                  onClick={() => handleAssign(vp.id)}
+                >
+                  {savingId === vp.id ? "Đang lưu..." : "Gán"}
+                </button>
+                <button className="btn btn-sm" style={{ flexShrink: 0 }} disabled={ignoringId === vp.id} onClick={() => handleIgnore(vp.id)}>
+                  {ignoringId === vp.id ? "Đang lưu..." : "Bỏ qua"}
+                </button>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <KtvCombobox
-                value={assigning[vp.id] ?? ""}
-                onChange={(v) => setAssigning((prev) => ({ ...prev, [vp.id]: v }))}
-                options={ktvOptions}
-                placeholder="-- Chọn KTV --"
-                containerStyle={{ flex: "1 1 200px" }}
-              />
-              <button
-                className="btn btn-primary btn-sm"
-                style={{ flexShrink: 0 }}
-                disabled={!assigning[vp.id] || savingId === vp.id}
-                onClick={() => handleAssign(vp.id)}
-              >
-                {savingId === vp.id ? "Đang lưu..." : "Gán"}
+          ))}
+          {chuaXacDinhTotalPages > 1 && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 10, alignItems: "center", marginTop: 10, marginBottom: 20 }}>
+              <button className="btn btn-sm" disabled={chuaXacDinhPage <= 1} onClick={() => setChuaXacDinhPage((p) => p - 1)}>
+                Trước
+              </button>
+              <span className="card-meta">
+                Trang {chuaXacDinhPage}/{chuaXacDinhTotalPages}
+              </span>
+              <button className="btn btn-sm" disabled={chuaXacDinhPage >= chuaXacDinhTotalPages} onClick={() => setChuaXacDinhPage((p) => p + 1)}>
+                Sau
               </button>
             </div>
-          </div>
-        ))
+          )}
+        </>
       )}
 
       <TatCaViPham ktvOptions={ktvOptions} />

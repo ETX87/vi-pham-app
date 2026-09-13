@@ -10,11 +10,33 @@ import { notifyKtvViPham } from "./nhanViPham";
 const adminViPham = new Hono<{ Bindings: Env }>();
 adminViPham.use("*", verifySessionMiddleware, loadUser, requireAdmin);
 
-// GET /vi-pham/chua-xac-dinh - danh sach vi pham CHUA khop duoc KTV nao (ky_thuat_vien_ma_ktv
-// NULL), moi nhat truoc.
+const CHUA_XAC_DINH_PAGE_SIZE = 10;
+
+// GET /vi-pham/chua-xac-dinh?page=1 - danh sach vi pham CHUA khop duoc KTV nao (ky_thuat_vien_ma_ktv
+// NULL) VA CHUA bi Admin bam "Bo qua" (bo_qua_gan_ktv = 0, xem migration 0004), moi nhat truoc,
+// phan trang 10 dong/lan (truoc day tai het 1 lan, co the rat dai neu danh ba KTV bi loi ten kieu
+// lap lai - xem phan hoi nguoi dung).
 adminViPham.get("/vi-pham/chua-xac-dinh", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT * FROM vi_pham WHERE ky_thuat_vien_ma_ktv IS NULL ORDER BY nhan_luc DESC").all();
-  return c.json({ rows: results });
+  const page = Math.max(1, Number(c.req.query("page")) || 1);
+  const offset = (page - 1) * CHUA_XAC_DINH_PAGE_SIZE;
+
+  const countRow = await c.env.DB.prepare("SELECT COUNT(*) as total FROM vi_pham WHERE ky_thuat_vien_ma_ktv IS NULL AND bo_qua_gan_ktv = 0").first<{ total: number }>();
+  const { results } = await c.env.DB.prepare(
+    "SELECT * FROM vi_pham WHERE ky_thuat_vien_ma_ktv IS NULL AND bo_qua_gan_ktv = 0 ORDER BY nhan_luc DESC LIMIT ? OFFSET ?",
+  )
+    .bind(CHUA_XAC_DINH_PAGE_SIZE, offset)
+    .all();
+  return c.json({ rows: results, total: countRow?.total ?? 0, page, pageSize: CHUA_XAC_DINH_PAGE_SIZE });
+});
+
+// PATCH /vi-pham/:id/bo-qua-gan-ktv - Admin bam "Bo qua" cho 1 dong dang cho gan KTV (vd ten KTV
+// tho tu DVBH la du lieu rac/KTV da nghi khong con can gan) - an khoi hang doi GET o tren, KHONG xoa
+// du lieu vi_pham (co the mo rong sau thanh 1 tab "Da bo qua" rieng, xem phan hoi nguoi dung).
+adminViPham.patch("/vi-pham/:id/bo-qua-gan-ktv", async (c) => {
+  const id = c.req.param("id");
+  const result = await c.env.DB.prepare("UPDATE vi_pham SET bo_qua_gan_ktv = 1 WHERE id = ?").bind(id).run();
+  if ((result.meta.changes ?? 0) === 0) return c.json({ error: "NOT_FOUND" }, 404);
+  return c.json({ ok: true });
 });
 
 // GET /vi-pham/ktv-options - danh sach KTV (de Admin chon khi gan tay) - chi can ma_ktv/ten_hien_thi.
@@ -85,13 +107,18 @@ interface GanKtvBody {
 }
 
 // PATCH /vi-pham/:id/gan-ktv - gan tay ky_thuat_vien_ma_ktv + kich hoat lai push/in-app noti (dung
-// chung notifyKtvViPham() voi luong tu dong o nhanViPham.ts).
+// chung notifyKtvViPham() voi luong tu dong o nhanViPham.ts). Gan HANG LOAT: cac vi pham KHAC cung
+// dang cho gan (ky_thuat_vien_ma_ktv NULL, chua bi bo qua) VA co CUNG chuoi "ky_thuat_vien_ten" tho
+// tu DVBH (vd 1 KTV bi loi khop ten lap lai nhieu lan - xem phan hoi nguoi dung) duoc gan CUNG LUC,
+// tranh Admin phai lap lai thao tac cho tung dong.
 adminViPham.patch("/vi-pham/:id/gan-ktv", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json<GanKtvBody>().catch(() => null);
   if (!body?.ma_ktv) return c.json({ error: "MISSING_MA_KTV" }, 400);
 
-  const viPham = await c.env.DB.prepare("SELECT id, loai_loi, case_id FROM vi_pham WHERE id = ?").bind(id).first<{ id: string; loai_loi: string; case_id: string | null }>();
+  const viPham = await c.env.DB.prepare("SELECT id, loai_loi, case_id, ky_thuat_vien_ten FROM vi_pham WHERE id = ?")
+    .bind(id)
+    .first<{ id: string; loai_loi: string; case_id: string | null; ky_thuat_vien_ten: string | null }>();
   if (!viPham) return c.json({ error: "NOT_FOUND" }, 404);
 
   const ktv = await c.env.DB.prepare("SELECT ma_ktv, ten_hien_thi, email_dang_nhap FROM ktv_lien_he WHERE ma_ktv = ?")
@@ -99,10 +126,24 @@ adminViPham.patch("/vi-pham/:id/gan-ktv", async (c) => {
     .first<{ ma_ktv: string; ten_hien_thi: string | null; email_dang_nhap: string | null }>();
   if (!ktv) return c.json({ error: "KTV_NOT_FOUND" }, 404);
 
-  await c.env.DB.prepare("UPDATE vi_pham SET ky_thuat_vien_ma_ktv = ? WHERE id = ?").bind(ktv.ma_ktv, id).run();
-  c.executionCtx.waitUntil(notifyKtvViPham(c.env, ktv, viPham));
+  const cungTen = viPham.ky_thuat_vien_ten
+    ? (
+        await c.env.DB.prepare(
+          "SELECT id, loai_loi, case_id FROM vi_pham WHERE id != ? AND ky_thuat_vien_ma_ktv IS NULL AND bo_qua_gan_ktv = 0 AND ky_thuat_vien_ten = ?",
+        )
+          .bind(id, viPham.ky_thuat_vien_ten)
+          .all<{ id: string; loai_loi: string; case_id: string | null }>()
+      ).results
+    : [];
 
-  return c.json({ ok: true });
+  const danhSachGan = [{ id: viPham.id, loai_loi: viPham.loai_loi, case_id: viPham.case_id }, ...cungTen];
+  const placeholders = danhSachGan.map(() => "?").join(",");
+  await c.env.DB.prepare(`UPDATE vi_pham SET ky_thuat_vien_ma_ktv = ? WHERE id IN (${placeholders})`)
+    .bind(ktv.ma_ktv, ...danhSachGan.map((v) => v.id))
+    .run();
+  c.executionCtx.waitUntil(Promise.all(danhSachGan.map((vp) => notifyKtvViPham(c.env, ktv, vp))));
+
+  return c.json({ ok: true, soLuongDaGan: danhSachGan.length });
 });
 
 export default adminViPham;
