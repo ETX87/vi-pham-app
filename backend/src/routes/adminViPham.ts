@@ -47,16 +47,23 @@ adminViPham.get("/vi-pham/tat-ca", async (c) => {
     conditions.push("(LOWER(COALESCE(vp.case_id,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.khach_hang,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.seri_san_pham,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.ky_thuat_vien_ten,'')) LIKE LOWER(?))");
     binds.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
-  // 3 trang thai khop DUNG logic components/StatusBadge.tsx ben frontend (viPhamStatus()) - viet lai
-  // bang EXISTS truc tiep vi SQLite khong cho WHERE tham chieu alias cua chinh SELECT do.
+  // 4 trang thai khop DUNG logic components/StatusBadge.tsx ben frontend (viPhamStatus()) - viet lai
+  // bang EXISTS truc tiep vi SQLite khong cho WHERE tham chieu alias cua chinh SELECT do. Thu tu uu
+  // tien giong het frontend: da chot loi > cho chot loi > qua han > chua giai trinh.
   const daGiaiTrinh = "EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id)";
   const dangChoDongBo = "EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id AND gt.dong_bo_dvbh_luc IS NULL)";
-  if (trangThai === "chua-xu-ly") {
-    conditions.push(`NOT ${daGiaiTrinh} AND (vp.chot_bo_cap_2 IS NULL OR vp.chot_bo_cap_2 != 0)`);
-  } else if (trangThai === "dang-cho-dong-bo") {
-    conditions.push(`${daGiaiTrinh} AND ${dangChoDongBo}`);
-  } else if (trangThai === "da-xu-ly") {
-    conditions.push(`NOT (${daGiaiTrinh} AND ${dangChoDongBo}) AND NOT (NOT ${daGiaiTrinh} AND (vp.chot_bo_cap_2 IS NULL OR vp.chot_bo_cap_2 != 0))`);
+  // "ngay_ghi_nhan" luu gio VN dia phuong dang chuoi (xem lib/vnTime.ts) - datetime('now') cua SQLite
+  // tra ve UTC nen phai cong +7h de cung quy uoc truoc khi tru 48h, roi so sanh CHUOI (an toan vi
+  // cung 1 format YYYY-MM-DD HH:MM:SS).
+  const quaHan = `vp.ngay_ghi_nhan <= datetime('now', '+7 hours', '-48 hours')`;
+  if (trangThai === "chua-giai-trinh") {
+    conditions.push(`vp.chot_bo_cap_2 IS NULL AND NOT ${daGiaiTrinh} AND NOT (${quaHan})`);
+  } else if (trangThai === "qua-han") {
+    conditions.push(`vp.chot_bo_cap_2 IS NULL AND NOT ${daGiaiTrinh} AND ${quaHan}`);
+  } else if (trangThai === "cho-chot-loi") {
+    conditions.push(`vp.chot_bo_cap_2 IS NULL AND ${daGiaiTrinh}`);
+  } else if (trangThai === "da-chot-loi") {
+    conditions.push(`vp.chot_bo_cap_2 IS NOT NULL`);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

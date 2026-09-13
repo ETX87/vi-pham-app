@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronRight, ClipboardList, AlertCircle, Clock3, CheckCircle2, LifeBuoy } from "lucide-react";
+import { ChevronRight, ClipboardList, AlertCircle, AlertTriangle, Clock3, CheckCircle2, LifeBuoy } from "lucide-react";
 import { api } from "../api/client";
 import type { ViPham } from "../types";
 import { loaiLoiLabel } from "../lib/format";
@@ -12,15 +12,14 @@ interface ListResponse {
 
 function ThongTinNhanh({ rows }: { rows: ViPham[] }) {
   const tong = rows.length;
-  const dangChoDongBo = rows.filter((r) => r.da_giai_trinh && r.dang_cho_dong_bo).length;
-  const chuaXuLy = rows.filter((r) => viPhamStatus(r).cls === "status-pending").length;
-  const daXuLy = tong - chuaXuLy - dangChoDongBo;
+  const dem = (cls: string) => rows.filter((r) => viPhamStatus(r).cls === cls).length;
 
   const items = [
     { icon: <ClipboardList size={16} />, bg: "var(--ink-400)", label: "Tổng vi phạm của tôi", value: tong },
-    { icon: <AlertCircle size={16} />, bg: "var(--red-600)", label: "Chưa xử lý", value: chuaXuLy },
-    { icon: <Clock3 size={16} />, bg: "var(--amber-500)", label: "Đang chờ đồng bộ", value: dangChoDongBo },
-    { icon: <CheckCircle2 size={16} />, bg: "var(--green-600)", label: "Đã xử lý", value: daXuLy },
+    { icon: <AlertCircle size={16} />, bg: "var(--amber-500)", label: "Chưa giải trình", value: dem("status-not-submitted") },
+    { icon: <AlertTriangle size={16} />, bg: "var(--red-600)", label: "Quá hạn giải trình", value: dem("status-overdue") },
+    { icon: <Clock3 size={16} />, bg: "var(--blue-600)", label: "Chờ chốt lỗi", value: dem("status-awaiting") },
+    { icon: <CheckCircle2 size={16} />, bg: "var(--green-600)", label: "Đã chốt lỗi", value: dem("status-decided") },
   ];
 
   return (
@@ -86,7 +85,7 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
         {rows.map((vp) => {
           const status = viPhamStatus(vp);
           return (
-            <div key={vp.id} className={`card card-clickable ${status.cls === "status-pending" ? "card-priority" : ""}`} onClick={() => onSelect(vp.id)}>
+            <div key={vp.id} className={`card card-clickable ${status.cls === "status-overdue" ? "card-priority" : ""}`} onClick={() => onSelect(vp.id)}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 700, marginBottom: 2 }}>#{vp.id}</div>

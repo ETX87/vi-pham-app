@@ -28,9 +28,10 @@ type ViPhamRowTatCa = ViPham & { ten_ktv_khop: string | null };
 
 const TRANG_THAI_OPTIONS = [
   { value: "", label: "Tất cả trạng thái" },
-  { value: "chua-xu-ly", label: "Chưa xử lý" },
-  { value: "dang-cho-dong-bo", label: "Đang chờ đồng bộ" },
-  { value: "da-xu-ly", label: "Đã xử lý" },
+  { value: "chua-giai-trinh", label: "Chưa giải trình" },
+  { value: "qua-han", label: "Quá hạn giải trình" },
+  { value: "cho-chot-loi", label: "Chờ chốt lỗi" },
+  { value: "da-chot-loi", label: "Đã chốt lỗi" },
 ];
 
 // Muc Admin: xem TOAN BO vi pham he thong (khong loc theo nguoi dang nhap nhu man KTV) - thieu
