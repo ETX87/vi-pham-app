@@ -1,16 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronRight, ClipboardList, AlertCircle, AlertTriangle, Clock3, CheckCircle2, LifeBuoy } from "lucide-react";
 import { api } from "../api/client";
 import type { ViPham } from "../types";
 import { loaiLoiLabel } from "../lib/format";
 import { StatusBadge, viPhamStatus } from "../components/StatusBadge";
 
-interface ListResponse {
-  rows: ViPham[];
-  chuaXuLy: number;
+interface ThongKe {
+  tong: number;
+  chuaGiaiTrinh: number;
+  quaHan: number;
+  choChot: number;
+  daChot: number;
 }
 
-const PAGE_SIZE = 10;
+interface ListResponse {
+  rows: ViPham[];
+  hasMore: boolean;
+  chuaXuLy: number;
+  thongKe: ThongKe;
+}
 
 const TRANG_THAI_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "Tất cả trạng thái" },
@@ -20,16 +28,13 @@ const TRANG_THAI_OPTIONS: { value: string; label: string }[] = [
   { value: "status-decided", label: "Đã chốt lỗi" },
 ];
 
-function ThongTinNhanh({ rows }: { rows: ViPham[] }) {
-  const tong = rows.length;
-  const dem = (cls: string) => rows.filter((r) => viPhamStatus(r).cls === cls).length;
-
+function ThongTinNhanh({ thongKe }: { thongKe: ThongKe }) {
   const items = [
-    { icon: <ClipboardList size={16} />, bg: "var(--ink-400)", label: "Tổng vi phạm của tôi", value: tong },
-    { icon: <AlertCircle size={16} />, bg: "var(--amber-500)", label: "Chưa giải trình", value: dem("status-not-submitted") },
-    { icon: <AlertTriangle size={16} />, bg: "var(--red-600)", label: "Quá hạn giải trình", value: dem("status-overdue") },
-    { icon: <Clock3 size={16} />, bg: "var(--blue-600)", label: "Chờ chốt lỗi", value: dem("status-awaiting") },
-    { icon: <CheckCircle2 size={16} />, bg: "var(--green-600)", label: "Đã chốt lỗi", value: dem("status-decided") },
+    { icon: <ClipboardList size={16} />, bg: "var(--ink-400)", label: "Tổng vi phạm của tôi", value: thongKe.tong },
+    { icon: <AlertCircle size={16} />, bg: "var(--amber-500)", label: "Chưa giải trình", value: thongKe.chuaGiaiTrinh },
+    { icon: <AlertTriangle size={16} />, bg: "var(--red-600)", label: "Quá hạn giải trình", value: thongKe.quaHan },
+    { icon: <Clock3 size={16} />, bg: "var(--blue-600)", label: "Chờ chốt lỗi", value: thongKe.choChot },
+    { icon: <CheckCircle2 size={16} />, bg: "var(--green-600)", label: "Đã chốt lỗi", value: thongKe.daChot },
   ];
 
   return (
@@ -62,50 +67,84 @@ function ThongTinNhanh({ rows }: { rows: ViPham[] }) {
 }
 
 export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void }) {
-  const [data, setData] = useState<ListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [trangThai, setTrangThai] = useState("");
+  const [rows, setRows] = useState<ViPham[]>([]);
+  const [chuaXuLy, setChuaXuLy] = useState(0);
+  const [thongKe, setThongKe] = useState<ThongKe>({ tong: 0, chuaGiaiTrinh: 0, quaHan: 0, choChot: 0, daChot: 0 });
   const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
+  // Doi bo loc trang thai -> nap lai tu trang 1 (khong giu du lieu trang cu cua bo loc truoc).
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError(null);
     api
-      .get<ListResponse>("/giai-trinh/vi-pham")
-      .then((res) => !cancelled && setData(res))
+      .get<ListResponse>(`/giai-trinh/vi-pham?trang_thai=${trangThai}&page=1`)
+      .then((res) => {
+        if (cancelled) return;
+        setRows(res.rows);
+        setChuaXuLy(res.chuaXuLy);
+        setThongKe(res.thongKe);
+        setHasMore(res.hasMore);
+        setPage(1);
+      })
       .catch(() => !cancelled && setError("Không tải được danh sách vi phạm."))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [trangThai]);
+
+  function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    api
+      .get<ListResponse>(`/giai-trinh/vi-pham?trang_thai=${trangThai}&page=${nextPage}`)
+      .then((res) => {
+        setRows((prev) => [...prev, ...res.rows]);
+        setChuaXuLy(res.chuaXuLy);
+        setThongKe(res.thongKe);
+        setHasMore(res.hasMore);
+        setPage(nextPage);
+      })
+      .finally(() => setLoadingMore(false));
+  }
+
+  // Infinite scroll kieu Facebook - cham sentinel o cuoi danh sach thi tu tai trang tiep theo, thay
+  // vi tai toan bo vi pham cua KTV 1 lan (ton doc D1 neu KTV co hang tram vi pham).
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sentinelRef.current, hasMore, loadingMore, page, trangThai]);
 
   if (loading) return <div className="loading-state">Đang tải...</div>;
   if (error) return <div className="alert alert-error">{error}</div>;
 
-  const rows = data?.rows ?? [];
-  const filteredRows = trangThai ? rows.filter((vp) => viPhamStatus(vp).cls === trangThai) : rows;
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  const pageRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
   const list =
-    rows.length === 0 ? (
+    thongKe.tong === 0 ? (
       <div className="empty-state">Bạn chưa có vi phạm nào cần giải trình. 🎉</div>
     ) : (
       <div>
         <div className="section-title" style={{ marginTop: 0, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <span>
-            Vi phạm cần xử lý {data && data.chuaXuLy > 0 && <span className="badge">{data.chuaXuLy}</span>}
+            Vi phạm cần xử lý {chuaXuLy > 0 && <span className="badge">{chuaXuLy}</span>}
           </span>
-          <select
-            value={trangThai}
-            onChange={(e) => {
-              setTrangThai(e.target.value);
-              setPage(1);
-            }}
-            style={{ fontWeight: 400 }}
-          >
+          <select value={trangThai} onChange={(e) => setTrangThai(e.target.value)} style={{ fontWeight: 400 }}>
             {TRANG_THAI_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -113,11 +152,11 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
             ))}
           </select>
         </div>
-        {filteredRows.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="empty-state">Không có vi phạm nào khớp bộ lọc đã chọn.</div>
         ) : (
           <>
-            {pageRows.map((vp) => {
+            {rows.map((vp) => {
               const status = viPhamStatus(vp);
               return (
                 <div key={vp.id} className={`card card-clickable ${status.cls === "status-overdue" ? "card-priority" : ""}`} onClick={() => onSelect(vp.id)}>
@@ -145,19 +184,8 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
                 </div>
               );
             })}
-            {totalPages > 1 && (
-              <div style={{ display: "flex", justifyContent: "center", gap: 10, alignItems: "center", marginTop: 10 }}>
-                <button className="btn btn-sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                  Trước
-                </button>
-                <span className="card-meta">
-                  Trang {page}/{totalPages}
-                </span>
-                <button className="btn btn-sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-                  Sau
-                </button>
-              </div>
-            )}
+            <div ref={sentinelRef} />
+            {loadingMore && <div className="loading-state">Đang tải thêm...</div>}
           </>
         )}
       </div>
@@ -166,9 +194,9 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
   return (
     <div className="desktop-layout">
       <div className="desktop-main">{list}</div>
-      {rows.length > 0 && (
+      {thongKe.tong > 0 && (
         <div className="desktop-sidebar">
-          <ThongTinNhanh rows={rows} />
+          <ThongTinNhanh thongKe={thongKe} />
         </div>
       )}
     </div>

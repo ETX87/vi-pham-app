@@ -38,30 +38,87 @@ interface ViPhamRow {
   ngay_chot: string | null;
 }
 
-// GET /vi-pham - danh sach vi pham cua CHINH KTV dang dang nhap, moi nhat truoc. "da_giai_trinh"
-// (0/1) de frontend hien badge "chua xu ly" - tinh qua EXISTS thay vi JOIN de tranh nhan trung
-// dong khi 1 vi_pham co nhieu ban giai trinh (ve nguyen tac schema cho phep, xem migration).
-// "dang_cho_dong_bo" (0/1, chi co y nghia khi da_giai_trinh=1) - CON giai trinh nao cua vi pham nay
-// chua gui thanh cong ve DVBH (dong_bo_dvbh_luc IS NULL) - dung de frontend phan biet badge "Da xu
-// ly" (xanh, da dong bo xong) voi "Dang cho dong bo" (vang, da nop nhung chua gui ve DVBH duoc).
+const VI_PHAM_PAGE_SIZE = 10;
+
+// Bieu thuc SQL "gio hien tai" theo dung quy uoc gio VN dia phuong dang chuoi cua toan he thong
+// (xem lib/vnTime.ts nowVN()) - CONG 7h vao UTC roi so sanh chuoi truc tiep voi ngay_ghi_nhan (cung
+// quy uoc), KHONG dung datetime('now','localtime') vi Workers chay UTC, ket qua se sai gio VN.
+const SQL_NOW_VN = "datetime('now', '+7 hours')";
+
+// Dieu kien WHERE cho tung trang thai hien thi (StatusBadge.tsx viPhamStatus(), theo dung thu tu uu
+// tien) - dung lai da_giai_trinh/chot_bo_cap_2 da tinh san trong CTE vp_ext ben duoi. "Qua han giai
+// trinh" = chua nop, QC chua chot, va da qua 48h ke tu ngay_ghi_nhan (giong isQuaHanGiaiTrinh() JS).
+function dieuKienTrangThai(trangThai: string | undefined): string {
+  switch (trangThai) {
+    case "status-decided":
+      return "chot_bo_cap_2 IS NOT NULL";
+    case "status-awaiting":
+      return "chot_bo_cap_2 IS NULL AND da_giai_trinh = 1";
+    case "status-overdue":
+      return `chot_bo_cap_2 IS NULL AND da_giai_trinh = 0 AND ngay_ghi_nhan < datetime(${SQL_NOW_VN}, '-48 hours')`;
+    case "status-not-submitted":
+      return `chot_bo_cap_2 IS NULL AND da_giai_trinh = 0 AND ngay_ghi_nhan >= datetime(${SQL_NOW_VN}, '-48 hours')`;
+    default:
+      return "1=1";
+  }
+}
+
+const VP_EXT_CTE = `WITH vp_ext AS (
+  SELECT vp.*,
+         EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id) as da_giai_trinh,
+         EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id AND gt.dong_bo_dvbh_luc IS NULL) as dang_cho_dong_bo
+  FROM vi_pham vp WHERE vp.ky_thuat_vien_ma_ktv = ?
+)`;
+
+// GET /vi-pham?trang_thai=...&page=1 - danh sach vi pham cua CHINH KTV dang dang nhap, moi nhat
+// (theo ngay_ghi_nhan) truoc, phan trang 10 dong/lan (infinite-scroll o frontend, giong GET
+// /thong-bao) de tranh doc het toan bo vi pham moi lan mo man hinh. "thongKe" (dem theo tung trang
+// thai + tong) va "chuaXuLy" (badge) luon tinh TREN TOAN BO vi pham cua KTV nay (khong theo
+// trang_thai/page dang xem) bang 1 cau aggregate RIENG, KHONG phai tu "rows" cua trang hien tai.
 giaiTrinh.get("/vi-pham", async (c) => {
   const user = c.get("user");
   const maKtv = await getMaKtvForEmail(c.env.DB, user.email);
-  if (!maKtv) return c.json({ rows: [], chuaXuLy: 0 });
+  if (!maKtv) return c.json({ rows: [], hasMore: false, chuaXuLy: 0, thongKe: { tong: 0, chuaGiaiTrinh: 0, quaHan: 0, choChot: 0, daChot: 0 } });
+
+  const trangThai = c.req.query("trang_thai");
+  const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10) || 1);
+  const offset = (page - 1) * VI_PHAM_PAGE_SIZE;
 
   const { results } = await c.env.DB.prepare(
-    `SELECT vp.*,
-            EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id) as da_giai_trinh,
-            EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id AND gt.dong_bo_dvbh_luc IS NULL) as dang_cho_dong_bo
-     FROM vi_pham vp WHERE vp.ky_thuat_vien_ma_ktv = ? ORDER BY vp.ngay_ghi_nhan DESC`,
+    `${VP_EXT_CTE} SELECT * FROM vp_ext WHERE ${dieuKienTrangThai(trangThai)} ORDER BY ngay_ghi_nhan DESC LIMIT ? OFFSET ?`,
+  )
+    .bind(maKtv, VI_PHAM_PAGE_SIZE + 1, offset)
+    .all<ViPhamRow>();
+  const hasMore = results.length > VI_PHAM_PAGE_SIZE;
+  const rows = hasMore ? results.slice(0, VI_PHAM_PAGE_SIZE) : results;
+
+  const thongKeRow = await c.env.DB.prepare(
+    `${VP_EXT_CTE} SELECT
+        COUNT(*) as tong,
+        SUM(CASE WHEN ${dieuKienTrangThai("status-not-submitted")} THEN 1 ELSE 0 END) as chua_giai_trinh,
+        SUM(CASE WHEN ${dieuKienTrangThai("status-overdue")} THEN 1 ELSE 0 END) as qua_han,
+        SUM(CASE WHEN ${dieuKienTrangThai("status-awaiting")} THEN 1 ELSE 0 END) as cho_chot,
+        SUM(CASE WHEN ${dieuKienTrangThai("status-decided")} THEN 1 ELSE 0 END) as da_chot,
+        -- QC da BO (chot_bo_cap_2 = 0) nghia la khong con can giai trinh nua du chua nop - khong
+        -- tinh vao "can xu ly" (van hien trong danh sach de KTV xem lai, chi khac o tag hien thi).
+        SUM(CASE WHEN da_giai_trinh = 0 AND (chot_bo_cap_2 IS NULL OR chot_bo_cap_2 != 0) THEN 1 ELSE 0 END) as chua_xu_ly
+     FROM vp_ext`,
   )
     .bind(maKtv)
-    .all<ViPhamRow>();
+    .first<{ tong: number; chua_giai_trinh: number; qua_han: number; cho_chot: number; da_chot: number; chua_xu_ly: number }>();
 
-  // QC da BO (chot_bo_cap_2 === 0) nghia la khong con can giai trinh nua du chua nop - khong tinh
-  // vao badge "can xu ly" (van hien trong danh sach de KTV xem lai, chi khac o tag hien thi).
-  const chuaXuLy = results.filter((r) => !r.da_giai_trinh && r.chot_bo_cap_2 !== 0).length;
-  return c.json({ rows: results, chuaXuLy });
+  return c.json({
+    rows,
+    hasMore,
+    chuaXuLy: thongKeRow?.chua_xu_ly ?? 0,
+    thongKe: {
+      tong: thongKeRow?.tong ?? 0,
+      chuaGiaiTrinh: thongKeRow?.chua_giai_trinh ?? 0,
+      quaHan: thongKeRow?.qua_han ?? 0,
+      choChot: thongKeRow?.cho_chot ?? 0,
+      daChot: thongKeRow?.da_chot ?? 0,
+    },
+  });
 });
 
 // GET /vi-pham/:id - chi tiet 1 vi pham, kem giai trinh da nop (neu co) - 403 neu khong phai vi
