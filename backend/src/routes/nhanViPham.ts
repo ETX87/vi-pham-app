@@ -29,6 +29,9 @@ interface NghiNgoMoiBody {
   seri_san_pham?: string | null;
   ngay_ghi_nhan: string;
   nguoi_ghi_nhan: string;
+  // Ghi chu CSKH nhap ben DVBH (thêm 2026-09-14, xem PARTNER_API_GUIDE.md muc 9.1.1) - optional de
+  // tuong thich nguoc voi DVBH ban cu chua gui truong nay.
+  ghi_chu?: string | null;
 }
 
 interface QcChotCap2Body {
@@ -97,8 +100,8 @@ async function handleNghiNgoMoi(c: Context<{ Bindings: Env }>, body: NghiNgoMoiB
 
   const insertResult = await c.env.DB.prepare(
     `INSERT OR IGNORE INTO vi_pham
-       (id, case_id, loai_loi, ket_qua_cap_1, khach_hang, khu_vuc, ky_thuat_vien_ten, seri_san_pham, ngay_ghi_nhan, nguoi_ghi_nhan, nhan_luc)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, case_id, loai_loi, ket_qua_cap_1, khach_hang, khu_vuc, ky_thuat_vien_ten, seri_san_pham, ngay_ghi_nhan, nguoi_ghi_nhan, nhan_luc, ghi_chu)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       body.vi_pham_id,
@@ -112,6 +115,7 @@ async function handleNghiNgoMoi(c: Context<{ Bindings: Env }>, body: NghiNgoMoiB
       body.ngay_ghi_nhan,
       body.nguoi_ghi_nhan,
       nowVN(),
+      body.ghi_chu ?? null,
     )
     .run();
 

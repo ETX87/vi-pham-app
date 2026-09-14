@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Camera, Clock, MapPin, Tag, User, Edit3, Send } from "lucide-react";
+import { ArrowLeft, Camera, Clock, MapPin, Tag, User, Edit3, Send, MessageSquare } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import type { GiaiTrinh, ViPham } from "../types";
 import { CaseLookupPanel } from "./CaseLookupPanel";
@@ -22,7 +22,10 @@ interface PhotoDraft {
   thumbnailUrl: string;
 }
 
-export function ViPhamDetailScreen({ id, onBack, onChanged }: { id: string; onBack: () => void; onChanged?: () => void }) {
+// readOnly = Admin dang xem qua man "Tat ca vi pham" (xem AdminScreen.tsx TatCaViPham) - chi xem,
+// khong duoc tao/nop giai trinh thay KTV (backend van chan 403 neu co go API thang, day chi la an
+// bot UI de tranh nham lan - xem phan hoi nguoi dung "xem noi dung ben trong nhu ktv dang xem").
+export function ViPhamDetailScreen({ id, onBack, onChanged, readOnly }: { id: string; onBack: () => void; onChanged?: () => void; readOnly?: boolean }) {
   const [data, setData] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -253,6 +256,17 @@ export function ViPhamDetailScreen({ id, onBack, onChanged }: { id: string; onBa
             </div>
           </div>
         )}
+        {viPham.ghi_chu && (
+          <div className="icon-row">
+            <span className="icon-row-icon">
+              <MessageSquare size={16} />
+            </span>
+            <div>
+              <div className="icon-row-label">Ghi chú của CSKH</div>
+              <div className="icon-row-value">{viPham.ghi_chu}</div>
+            </div>
+          </div>
+        )}
         <div className="icon-row">
           <span className="icon-row-icon">
             <User size={16} />
@@ -337,6 +351,8 @@ export function ViPhamDetailScreen({ id, onBack, onChanged }: { id: string; onBa
             );
           })}
         </div>
+      ) : readOnly ? (
+        <div className="alert alert-info">KTV chưa nộp giải trình cho vi phạm này.</div>
       ) : (
         <div>
           {submitResult?.ok && (

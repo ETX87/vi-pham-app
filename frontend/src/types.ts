@@ -20,6 +20,9 @@ export interface ViPham {
   ngay_ghi_nhan: string;
   nguoi_ghi_nhan: string;
   nhan_luc: string;
+  // Ghi chu CSKH nhap ben DVBH luc ghi nhan nghi ngo (thêm 2026-09-14) - dac biet quan trong khi
+  // ket_qua_cap_1 = "Loi khac" (khong co mo ta san).
+  ghi_chu: string | null;
   da_giai_trinh?: number;
   dang_cho_dong_bo?: number;
   // Ket qua chot cap 2 cua QC (PARTNER_API_GUIDE.md muc 9.1.2a) - NULL = QC chua chot.
