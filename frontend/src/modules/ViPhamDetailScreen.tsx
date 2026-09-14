@@ -7,6 +7,7 @@ import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
 import { loaiLoiLabel, ketQuaCap1Label } from "../lib/format";
 import { LoaiLoiHelp } from "../components/LoaiLoiHelp";
+import { KetQuaCap1Help } from "../components/KetQuaCap1Help";
 
 const MAX_ANH = 5;
 const MAX_CHARS = 1000;
@@ -244,7 +245,10 @@ export function ViPhamDetailScreen({ id, onBack, onChanged }: { id: string; onBa
               <Tag size={16} />
             </span>
             <div>
-              <div className="icon-row-label">Kết luận cấp 1</div>
+              <div className="icon-row-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                CSKH kết luận loại lỗi
+                <KetQuaCap1Help ma={viPham.ket_qua_cap_1} tenHienThi={ketQuaCap1Label(viPham.ket_qua_cap_1)} />
+              </div>
               <div className="icon-row-value">{ketQuaCap1Label(viPham.ket_qua_cap_1)}</div>
             </div>
           </div>

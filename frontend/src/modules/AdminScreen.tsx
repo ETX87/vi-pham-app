@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { HardDrive, Users, AlertTriangle, UserCog, ListChecks, HelpCircle, Plus, Pencil } from "lucide-react";
 import { api, ApiError } from "../api/client";
-import type { AppUser, KtvOption, LoaiLoiDinhNghia, ViPham } from "../types";
+import type { AppUser, KetQuaCap1DinhNghia, KtvOption, LoaiLoiDinhNghia, ViPham } from "../types";
 import { loaiLoiLabel } from "../lib/format";
 import { StatusBadge } from "../components/StatusBadge";
 import { KtvCombobox } from "../components/KtvCombobox";
 import { LoaiLoiHelp } from "../components/LoaiLoiHelp";
 import { useLoaiLoiMap } from "../contexts/LoaiLoiContext";
+import { useKetQuaCap1Map } from "../contexts/KetQuaCap1Context";
 
 interface DriveStatus {
   connected: boolean;
@@ -350,7 +351,7 @@ function QuanLyLoaiLoi() {
   return (
     <div>
       <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <HelpCircle size={15} /> Loại lỗi &amp; mô tả
+        <HelpCircle size={15} /> Loại nghi ngờ &amp; mô tả
       </div>
       <div className="card">
         <div className="card-meta" style={{ marginBottom: 10 }}>
@@ -431,6 +432,163 @@ function QuanLyLoaiLoi() {
         ) : (
           <button className="btn btn-sm" style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }} onClick={() => setShowAdd(true)}>
             <Plus size={14} /> Thêm loại lỗi
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Muc Admin: dinh nghia ten hien thi + mo ta chi tiet cho tung ket_qua_cap_1 ("CSKH ket luan loai
+// loi" - ket luan CSKH dua ra SAU khi xac minh voi khach hang, khac loai_loi la loai NGHI NGO ban
+// dau tu DVBH gui, xem QuanLyLoaiLoi() o tren + migration 0007). Cau truc giong het QuanLyLoaiLoi(),
+// chi khac endpoint + noi dung hien thi.
+function QuanLyKetQuaCap1() {
+  const { map, reload } = useKetQuaCap1Map();
+  const rows = Object.values(map).sort((a, b) => a.ten_hien_thi.localeCompare(b.ten_hien_thi, "vi"));
+
+  const [editingMa, setEditingMa] = useState<string | null>(null);
+  const [editTen, setEditTen] = useState("");
+  const [editMoTa, setEditMoTa] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [newMa, setNewMa] = useState("");
+  const [newTen, setNewTen] = useState("");
+  const [newMoTa, setNewMoTa] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  function startEdit(row: KetQuaCap1DinhNghia) {
+    setEditingMa(row.ma);
+    setEditTen(row.ten_hien_thi);
+    setEditMoTa(row.mo_ta);
+  }
+
+  async function saveEdit(ma: string) {
+    if (!editTen.trim() || !editMoTa.trim()) return;
+    setSavingEdit(true);
+    try {
+      await api.patch(`/ket-qua-cap-1/${encodeURIComponent(ma)}`, { ten_hien_thi: editTen.trim(), mo_ta: editMoTa.trim() });
+      setEditingMa(null);
+      reload();
+    } catch {
+      alert("Cập nhật thất bại - vui lòng thử lại.");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function handleAdd() {
+    if (!newMa.trim() || !newTen.trim() || !newMoTa.trim()) return;
+    setAdding(true);
+    try {
+      await api.post("/ket-qua-cap-1", { ma: newMa.trim(), ten_hien_thi: newTen.trim(), mo_ta: newMoTa.trim() });
+      setNewMa("");
+      setNewTen("");
+      setNewMoTa("");
+      setShowAdd(false);
+      reload();
+    } catch (err) {
+      alert(err instanceof ApiError && err.code === "DA_TON_TAI" ? "Mã kết luận này đã tồn tại." : "Thêm thất bại - vui lòng thử lại.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleDelete(ma: string) {
+    if (!confirm("Xóa mô tả kết luận này? (không ảnh hưởng các vi phạm đã ghi nhận, chỉ ẩn dấu (?) mô tả)")) return;
+    try {
+      await api.delete(`/ket-qua-cap-1/${encodeURIComponent(ma)}`);
+      reload();
+    } catch {
+      alert("Xóa thất bại - vui lòng thử lại.");
+    }
+  }
+
+  return (
+    <div>
+      <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <HelpCircle size={15} /> Lỗi vi phạm &amp; mô tả
+      </div>
+      <div className="card">
+        <div className="card-meta" style={{ marginBottom: 10 }}>
+          Nội dung ở đây hiện khi KTV bấm dấu (?) cạnh "CSKH kết luận loại lỗi" trên chi tiết vi phạm.
+        </div>
+        {rows.map((row) => {
+          const isEditing = editingMa === row.ma;
+          return (
+            <div key={row.ma} className="card" style={{ marginBottom: 8 }}>
+              {isEditing ? (
+                <div>
+                  <div className="field" style={{ marginBottom: 8 }}>
+                    <label className="field-label">Tên hiển thị</label>
+                    <input type="text" value={editTen} onChange={(e) => setEditTen(e.target.value)} />
+                  </div>
+                  <div className="field" style={{ marginBottom: 8 }}>
+                    <label className="field-label">Mô tả</label>
+                    <textarea rows={3} value={editMoTa} onChange={(e) => setEditMoTa(e.target.value)} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-primary btn-sm" disabled={savingEdit} onClick={() => saveEdit(row.ma)}>
+                      {savingEdit ? "Đang lưu..." : "Lưu"}
+                    </button>
+                    <button className="btn btn-sm" disabled={savingEdit} onClick={() => setEditingMa(null)}>
+                      Hủy
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="card-title">{row.ten_hien_thi}</div>
+                      <div className="card-meta" style={{ marginBottom: 6 }}>
+                        <span>Mã khớp: {row.ma}</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: "var(--ink-600)" }}>{row.mo_ta}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button className="btn btn-sm" onClick={() => startEdit(row)} aria-label="Sửa">
+                        <Pencil size={14} />
+                      </button>
+                      <button className="btn btn-sm" onClick={() => handleDelete(row.ma)} aria-label="Xóa">
+                        Xóa
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {rows.length === 0 && <div className="empty-state">Chưa có kết luận nào được mô tả.</div>}
+
+        {showAdd ? (
+          <div className="card" style={{ marginTop: 8 }}>
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label className="field-label">Mã kết luận (khớp đúng "ket_qua_cap_1" DVBH gửi sang, vd: Loi khong lien he)</label>
+              <input type="text" value={newMa} onChange={(e) => setNewMa(e.target.value)} placeholder="Loi khong lien he" />
+            </div>
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label className="field-label">Tên hiển thị</label>
+              <input type="text" value={newTen} onChange={(e) => setNewTen(e.target.value)} placeholder="Lỗi không liên hệ" />
+            </div>
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label className="field-label">Mô tả</label>
+              <textarea rows={3} value={newMoTa} onChange={(e) => setNewMoTa(e.target.value)} placeholder="Giải thích kết luận này để KTV hiểu rõ..." />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary btn-sm" disabled={adding} onClick={handleAdd}>
+                {adding ? "Đang lưu..." : "Thêm"}
+              </button>
+              <button className="btn btn-sm" disabled={adding} onClick={() => setShowAdd(false)}>
+                Hủy
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button className="btn btn-sm" style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }} onClick={() => setShowAdd(true)}>
+            <Plus size={14} /> Thêm kết luận
           </button>
         )}
       </div>
@@ -554,6 +712,7 @@ export function AdminScreen() {
       </div>
 
       <QuanLyLoaiLoi />
+      <QuanLyKetQuaCap1 />
 
       <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <AlertTriangle size={15} /> Chưa xác định KTV {chuaXacDinhTotal > 0 && <span className="badge">{chuaXacDinhTotal}</span>}

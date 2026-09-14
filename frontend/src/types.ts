@@ -117,6 +117,8 @@ export interface LoaiLoiDinhNghia {
   cap_nhat_boi: string | null;
 }
 
+export type KetQuaCap1DinhNghia = LoaiLoiDinhNghia;
+
 export interface KtvOption {
   ma_ktv: string;
   ten_hien_thi: string | null;

@@ -13,7 +13,7 @@ export function loaiLoiLabel(raw: string): string {
 }
 
 const KET_QUA_CAP_1_LABEL: Record<string, string> = {
-  "Loi khong lien he": "Lỗi không liên hệ được",
+  "Loi khong lien he": "Lỗi không liên hệ",
   "Loi sai bao cao": "Lỗi sai báo cáo",
   "Loi khac": "Lỗi khác",
 };
