@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Bell, HelpCircle, Phone, LogOut, ChevronRight } from "lucide-react";
+import { Bell, HelpCircle, Phone, LogOut, ChevronRight, Smartphone } from "lucide-react";
 import type { AppUser } from "../types";
 import type { usePushNotifications } from "../hooks/usePushNotifications";
+import { usePwaInstall } from "../hooks/usePwaInstall";
 import { Avatar } from "../components/Avatar";
 import { Modal } from "../components/Modal";
 
@@ -10,6 +11,16 @@ import { Modal } from "../components/Modal";
 export function AccountScreen({ user, push }: { user: AppUser; push: ReturnType<typeof usePushNotifications> }) {
   const [showGuide, setShowGuide] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
+  const install = usePwaInstall();
+
+  function handleInstallRowClick() {
+    // Android/Chrome/Edge da xac nhan co the prompt cai san co san - goi thang, khong can huong dan
+    // tay. iOS (va Chrome chua ban su kien kip) - mo modal huong dan thao tac tay vi trinh duyet
+    // khong cho code kich hoat cai dat duoc.
+    if (install.canPrompt) install.promptInstall();
+    else setShowInstallGuide(true);
+  }
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
@@ -39,6 +50,17 @@ export function AccountScreen({ user, push }: { user: AppUser; push: ReturnType<
           <span className="list-row-label">Cài đặt thông báo đẩy</span>
           {push.supported && <span className={`tag ${push.subscribed ? "tag-done" : "tag-pending"}`}>{push.subscribed ? "Đã bật" : "Chưa bật"}</span>}
         </button>
+        {install.showRow && (
+          <button className="list-row" onClick={handleInstallRowClick}>
+            <span className="list-row-icon">
+              <Smartphone size={18} />
+            </span>
+            <span className="list-row-label">Thêm vào màn hình chính</span>
+            <span className="list-row-chevron">
+              <ChevronRight size={18} />
+            </span>
+          </button>
+        )}
         <button className="list-row" onClick={() => setShowGuide(true)}>
           <span className="list-row-icon">
             <HelpCircle size={18} />
@@ -68,6 +90,29 @@ export function AccountScreen({ user, push }: { user: AppUser; push: ReturnType<
         </button>
       </div>
 
+      {showInstallGuide && (
+        <Modal onClose={() => setShowInstallGuide(false)}>
+          <div className="card">
+            <div className="card-title">Thêm vào màn hình chính</div>
+            {install.isIOS ? (
+              <ul style={{ fontSize: 14, lineHeight: 1.7, paddingLeft: 18, margin: "10px 0 0" }}>
+                <li>Bấm nút Chia sẻ (biểu tượng ô vuông có mũi tên) ở thanh dưới Safari.</li>
+                <li>Chọn "Thêm vào MH chính" (Add to Home Screen).</li>
+                <li>Bấm "Thêm" ở góc trên bên phải.</li>
+              </ul>
+            ) : (
+              <ul style={{ fontSize: 14, lineHeight: 1.7, paddingLeft: 18, margin: "10px 0 0" }}>
+                <li>Bấm menu ⋮ (3 chấm) ở góc trên bên phải trình duyệt.</li>
+                <li>Chọn "Cài đặt ứng dụng" hoặc "Thêm vào Màn hình chính".</li>
+              </ul>
+            )}
+            <div className="card-meta" style={{ marginTop: 10 }}>
+              Sau khi thêm, mở app từ icon trên màn hình chính (không phải qua trình duyệt) để nhận
+              thông báo và số chưa đọc đầy đủ.
+            </div>
+          </div>
+        </Modal>
+      )}
       {showGuide && (
         <Modal onClose={() => setShowGuide(false)}>
           <div className="card">
