@@ -4,6 +4,7 @@ export interface AppUser {
   vai_tro: "Admin" | null;
   trang_thai_duyet: "Cho duyet" | "Da duyet" | "Tu choi";
   bi_khoa: boolean;
+  ma_ktv_tu_khai?: string | null;
 }
 
 export interface ViPham {

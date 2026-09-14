@@ -1,3 +1,61 @@
+import { useState } from "react";
+
+// Man "Cho duyet" (gmail chua khop danh ba KTV, xem routes/auth.ts callback) cho go them ma KTV cua
+// minh de Admin doi chieu nhanh hon thay vi chi thay 1 email tro (xem phan hoi nguoi dung). Goi
+// truc tiep endpoint rieng /api/auth/ma-ktv-tu-khai (KHONG di qua middleware/loadUser.ts - middleware
+// do chan 403 PENDING_APPROVAL truoc ca khi toi duoc handler, xem ghi chu trong route).
+function MaKtvTuKhaiForm() {
+  const [ma, setMa] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!ma.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/auth/ma-ktv-tu-khai", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ma_ktv_tu_khai: ma.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      setDone(true);
+    } catch {
+      setError("Không gửi được - vui lòng thử lại.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (done) {
+    return <div className="alert alert-success" style={{ marginTop: 16, textAlign: "left" }}>Đã gửi mã KTV "{ma.trim()}" - Admin sẽ đối chiếu khi phê duyệt.</div>;
+  }
+
+  return (
+    <div style={{ marginTop: 16, textAlign: "left" }}>
+      <label className="field-label">Mã KTV trên hệ thống (nếu có)</label>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          type="text"
+          value={ma}
+          onChange={(e) => setMa(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="Nhập mã KTV..."
+          style={{ flex: 1 }}
+        />
+        <button className="btn btn-primary btn-sm" disabled={submitting || !ma.trim()} onClick={submit}>
+          {submitting ? "Đang gửi..." : "Gửi"}
+        </button>
+      </div>
+      <div className="card-meta" style={{ marginTop: 6 }}>Giúp Admin tìm đúng hồ sơ của bạn để phê duyệt nhanh hơn.</div>
+      {error && <div className="alert alert-error" style={{ marginTop: 8 }}>{error}</div>}
+    </div>
+  );
+}
+
 export function LoginScreen({ variant = "login" }: { variant?: "login" | "pending" | "rejected" | "disabled" }) {
   const messages: Record<string, { title: string; sub: string }> = {
     login: { title: "Giải trình vi phạm", sub: "Hệ thống giải trình vi phạm cho KTV - Dịch Vụ 3T" },
@@ -30,6 +88,7 @@ export function LoginScreen({ variant = "login" }: { variant?: "login" | "pendin
             🔧 Đăng nhập DEV (bỏ qua Google, chỉ local)
           </a>
         )}
+        {variant === "pending" && <MaKtvTuKhaiForm />}
       </div>
     </div>
   );

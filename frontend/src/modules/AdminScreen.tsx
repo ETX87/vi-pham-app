@@ -162,8 +162,15 @@ function TatCaViPham({ ktvOptions }: { ktvOptions: KtvOption[] }) {
 // Muc Admin: duyet/tu choi/khoa tai khoan - thieu phan nay thi tai khoan khong tu khop duoc KTV
 // (email dang nhap khac email_dang_nhap trong danh ba) ket "Cho duyet" vinh vien, khong ai xu ly
 // duoc (xem backend routes/adminUsers.ts + middleware/loadUser.ts).
+const TAI_KHOAN_TAB_OPTIONS: { value: "cho-duyet" | "da-duyet" | "tu-choi" | "tat-ca"; label: string }[] = [
+  { value: "cho-duyet", label: "Chờ duyệt" },
+  { value: "da-duyet", label: "Đã duyệt" },
+  { value: "tu-choi", label: "Từ chối" },
+  { value: "tat-ca", label: "Tất cả" },
+];
+
 function QuanLyTaiKhoan() {
-  const [tab, setTab] = useState<"cho-duyet" | "tat-ca">("cho-duyet");
+  const [tab, setTab] = useState<"cho-duyet" | "da-duyet" | "tu-choi" | "tat-ca">("cho-duyet");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<AppUser[] | null>(null);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
@@ -198,12 +205,11 @@ function QuanLyTaiKhoan() {
       </div>
       <div className="card">
         <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-          <button className={`btn btn-sm ${tab === "cho-duyet" ? "btn-primary" : ""}`} onClick={() => setTab("cho-duyet")}>
-            Chờ duyệt
-          </button>
-          <button className={`btn btn-sm ${tab === "tat-ca" ? "btn-primary" : ""}`} onClick={() => setTab("tat-ca")}>
-            Tất cả
-          </button>
+          {TAI_KHOAN_TAB_OPTIONS.map((o) => (
+            <button key={o.value} className={`btn btn-sm ${tab === o.value ? "btn-primary" : ""}`} onClick={() => setTab(o.value)}>
+              {o.label}
+            </button>
+          ))}
           <input
             type="text"
             placeholder="Tìm theo email/tên..."
@@ -234,6 +240,11 @@ function QuanLyTaiKhoan() {
                       <span>{u.email}</span>
                       {u.vai_tro === "Admin" && <span>Admin</span>}
                     </div>
+                    {u.ma_ktv_tu_khai && (
+                      <div className="card-meta" style={{ marginTop: 2 }}>
+                        <span>Mã KTV tự khai: {u.ma_ktv_tu_khai}</span>
+                      </div>
+                    )}
                   </div>
                   <span className={`tag ${st.cls}`}>{st.label}</span>
                 </div>

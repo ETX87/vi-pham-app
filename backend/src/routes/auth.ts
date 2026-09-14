@@ -143,6 +143,26 @@ auth.post("/logout", async (c) => {
   return c.json({ ok: true });
 });
 
+interface MaKtvTuKhaiBody {
+  ma_ktv_tu_khai: string;
+}
+
+// POST /ma-ktv-tu-khai - nguoi dung dang o trang thai "Cho duyet" (gmail chua khop danh ba KTV) tu
+// khai ma KTV cua minh de Admin doi chieu (xem phan hoi nguoi dung). CHI dung verifySessionMiddleware
+// (khong dung loadUser) vi loadUser CHAN luon 403 PENDING_APPROVAL cho tai khoan dang cho duyet -
+// nguoi dung se khong bao gio goi duoc endpoint nao di qua loadUser truoc khi duoc duyet.
+auth.post("/ma-ktv-tu-khai", verifySessionMiddleware, async (c) => {
+  const email = c.get("email");
+  const body = await c.req.json<MaKtvTuKhaiBody>().catch(() => null);
+  if (!body?.ma_ktv_tu_khai?.trim()) return c.json({ error: "MISSING_MA_KTV" }, 400);
+
+  const result = await c.env.DB.prepare("UPDATE users SET ma_ktv_tu_khai = ?, updated_at = ? WHERE email = ?")
+    .bind(body.ma_ktv_tu_khai.trim(), nowVN(), email)
+    .run();
+  if ((result.meta.changes ?? 0) === 0) return c.json({ error: "NOT_FOUND" }, 404);
+  return c.json({ ok: true });
+});
+
 auth.get("/me", verifySessionMiddleware, loadUser, async (c) => {
   const user = c.get("user");
   return c.json({ user });

@@ -11,7 +11,15 @@ import { nowVN } from "../lib/vnTime";
 const adminUsers = new Hono<{ Bindings: Env }>();
 adminUsers.use("*", verifySessionMiddleware, loadUser, requireAdmin);
 
-// GET /?tab=cho-duyet|tat-ca&search= - mac dinh tab "cho-duyet" (hang doi can xu ly truoc).
+// GET /?tab=cho-duyet|da-duyet|tu-choi|tat-ca&search= - mac dinh tab "cho-duyet" (hang doi can xu ly
+// truoc). "da-duyet"/"tu-choi" (them theo phan hoi nguoi dung "quan ly mail da duyet/tu choi") de
+// Admin loc rieng tung nhom, doi lai quyet dinh (Duyet/Tu choi lai) khong can loc qua "Tat ca".
+const TAB_TRANG_THAI: Record<string, TrangThaiDuyet> = {
+  "cho-duyet": "Cho duyet",
+  "da-duyet": "Da duyet",
+  "tu-choi": "Tu choi",
+};
+
 adminUsers.get("/", async (c) => {
   const tab = c.req.query("tab") ?? "cho-duyet";
   const search = c.req.query("search")?.trim();
@@ -19,21 +27,29 @@ adminUsers.get("/", async (c) => {
   const conditions: string[] = [];
   const binds: unknown[] = [];
 
-  if (tab === "cho-duyet") {
+  if (TAB_TRANG_THAI[tab]) {
     conditions.push("trang_thai_duyet = ?");
-    binds.push("Cho duyet");
+    binds.push(TAB_TRANG_THAI[tab]);
   }
   if (search) {
-    conditions.push("(LOWER(email) LIKE LOWER(?) OR LOWER(COALESCE(ten,'')) LIKE LOWER(?))");
-    binds.push(`%${search}%`, `%${search}%`);
+    conditions.push("(LOWER(email) LIKE LOWER(?) OR LOWER(COALESCE(ten,'')) LIKE LOWER(?) OR LOWER(COALESCE(ma_ktv_tu_khai,'')) LIKE LOWER(?))");
+    binds.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const { results } = await c.env.DB.prepare(
-    `SELECT email, ten, vai_tro, trang_thai_duyet, bi_khoa, created_at FROM users ${where} ORDER BY created_at DESC`,
+    `SELECT email, ten, vai_tro, trang_thai_duyet, bi_khoa, created_at, ma_ktv_tu_khai FROM users ${where} ORDER BY created_at DESC`,
   )
     .bind(...binds)
-    .all<{ email: string; ten: string | null; vai_tro: "Admin" | null; trang_thai_duyet: TrangThaiDuyet; bi_khoa: number; created_at: string }>();
+    .all<{
+      email: string;
+      ten: string | null;
+      vai_tro: "Admin" | null;
+      trang_thai_duyet: TrangThaiDuyet;
+      bi_khoa: number;
+      created_at: string;
+      ma_ktv_tu_khai: string | null;
+    }>();
   // bi_khoa la INTEGER 0/1 trong D1 - ep ve boolean that de khop dung contract AppUser.bi_khoa ben
   // frontend (xem middleware/loadUser.ts lam tuong tu cho endpoint /me).
   return c.json({ rows: results.map((r) => ({ ...r, bi_khoa: !!r.bi_khoa })) });
