@@ -141,6 +141,23 @@ body {
 .card-meta { font-size: 13px; color: var(--ink-600); display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .card-meta span { white-space: nowrap; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 
+.card-title-row { display: flex; align-items: center; gap: 6px; }
+.loai-loi-help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: var(--ink-100, #eee);
+  color: var(--ink-400);
+  cursor: pointer;
+  padding: 0;
+}
+.loai-loi-help-btn:hover { background: var(--brand-100, #f0e0e0); color: var(--brand-700); }
+
 .tag {
   display: inline-block;
   font-size: 11px;

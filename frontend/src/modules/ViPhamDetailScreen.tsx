@@ -6,6 +6,7 @@ import { CaseLookupPanel } from "./CaseLookupPanel";
 import { Modal } from "../components/Modal";
 import { StatusBadge } from "../components/StatusBadge";
 import { loaiLoiLabel, ketQuaCap1Label } from "../lib/format";
+import { LoaiLoiHelp } from "../components/LoaiLoiHelp";
 
 const MAX_ANH = 5;
 const MAX_CHARS = 1000;
@@ -110,8 +111,9 @@ export function ViPhamDetailScreen({ id, onBack, onChanged }: { id: string; onBa
 
         <div className="card">
           <div style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 700, marginBottom: 2 }}>#{viPham.id}</div>
-          <div className="card-title" style={{ marginBottom: 0 }}>
+          <div className="card-title card-title-row" style={{ marginBottom: 0 }}>
             {tieuDe}
+            <LoaiLoiHelp maLoi={viPham.loai_loi} tenHienThi={tieuDe} />
           </div>
         </div>
 
@@ -211,8 +213,9 @@ export function ViPhamDetailScreen({ id, onBack, onChanged }: { id: string; onBa
 
       <div className="card">
         <div style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 700, marginBottom: 2 }}>#{viPham.id}</div>
-        <div className="card-title" style={{ fontSize: 17, marginBottom: 10 }}>
+        <div className="card-title card-title-row" style={{ fontSize: 17, marginBottom: 10 }}>
           {tieuDe}
+          <LoaiLoiHelp maLoi={viPham.loai_loi} tenHienThi={tieuDe} />
         </div>
 
         <div className="icon-row">

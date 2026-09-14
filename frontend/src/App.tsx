@@ -11,6 +11,7 @@ import { AccountScreen } from "./modules/AccountScreen";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { BottomTabBar, type MobileTab } from "./layout/BottomTabBar";
 import { api } from "./api/client";
+import { LoaiLoiProvider } from "./contexts/LoaiLoiContext";
 
 type Tab = MobileTab;
 
@@ -83,6 +84,7 @@ function MainApp() {
   }
 
   return (
+    <LoaiLoiProvider>
     <div className="app-shell">
       <div className="topbar">
         <div className="topbar-title">
@@ -156,6 +158,7 @@ function MainApp() {
         thongBaoBadge={thongBaoBadge}
       />
     </div>
+    </LoaiLoiProvider>
   );
 }
 

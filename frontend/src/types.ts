@@ -108,6 +108,14 @@ export interface ThongBao {
   ngay_tao: string;
 }
 
+export interface LoaiLoiDinhNghia {
+  ma: string;
+  ten_hien_thi: string;
+  mo_ta: string;
+  cap_nhat_luc: string;
+  cap_nhat_boi: string | null;
+}
+
 export interface KtvOption {
   ma_ktv: string;
   ten_hien_thi: string | null;

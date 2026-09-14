@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type { ViPham } from "../types";
 import { loaiLoiLabel } from "../lib/format";
 import { StatusBadge, viPhamStatus } from "../components/StatusBadge";
+import { LoaiLoiHelp } from "../components/LoaiLoiHelp";
 
 interface ThongKe {
   tong: number;
@@ -163,7 +164,10 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 700, marginBottom: 2 }}>#{vp.id}</div>
-                      <div className="card-title">{loaiLoiLabel(vp.loai_loi)}</div>
+                      <div className="card-title card-title-row">
+                        {loaiLoiLabel(vp.loai_loi)}
+                        <LoaiLoiHelp maLoi={vp.loai_loi} tenHienThi={loaiLoiLabel(vp.loai_loi)} />
+                      </div>
                       <div className="card-meta" style={{ marginTop: 4 }}>
                         <span>{vp.ngay_ghi_nhan}</span>
                         {vp.khu_vuc && <span>{vp.khu_vuc}</span>}

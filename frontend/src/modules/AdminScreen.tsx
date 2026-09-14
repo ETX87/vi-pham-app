@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { HardDrive, Users, AlertTriangle, UserCog, ListChecks } from "lucide-react";
-import { api } from "../api/client";
-import type { AppUser, KtvOption, ViPham } from "../types";
+import { HardDrive, Users, AlertTriangle, UserCog, ListChecks, HelpCircle, Plus, Pencil } from "lucide-react";
+import { api, ApiError } from "../api/client";
+import type { AppUser, KtvOption, LoaiLoiDinhNghia, ViPham } from "../types";
 import { loaiLoiLabel } from "../lib/format";
 import { StatusBadge } from "../components/StatusBadge";
 import { KtvCombobox } from "../components/KtvCombobox";
+import { LoaiLoiHelp } from "../components/LoaiLoiHelp";
+import { useLoaiLoiMap } from "../contexts/LoaiLoiContext";
 
 interface DriveStatus {
   connected: boolean;
@@ -121,7 +123,10 @@ function TatCaViPham({ ktvOptions }: { ktvOptions: KtvOption[] }) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 700, marginBottom: 2 }}>#{vp.id}</div>
-                    <div className="card-title">{loaiLoiLabel(vp.loai_loi)}</div>
+                    <div className="card-title card-title-row">
+                      {loaiLoiLabel(vp.loai_loi)}
+                      <LoaiLoiHelp maLoi={vp.loai_loi} tenHienThi={loaiLoiLabel(vp.loai_loi)} />
+                    </div>
                     <div className="card-meta" style={{ marginTop: 4 }}>
                       {vp.case_id && <span>Case: {vp.case_id}</span>}
                       <span>KTV: {vp.ten_ktv_khop || vp.ky_thuat_vien_ten || "(chưa xác định)"}</span>
@@ -264,6 +269,164 @@ function QuanLyTaiKhoan() {
   );
 }
 
+// Muc Admin: dinh nghia ten hien thi + mo ta chi tiet cho tung loai_loi (migration 0005) - de KTV
+// bam dau (?) tren card vi pham hieu ro dang bi vi pham gi (truoc gio chi thay ten ngan gon, xem
+// phan hoi nguoi dung "hien tai chi hien ten nen KTV khong hieu loi gi"). "ma" phai go dung CHINH
+// XAC chuoi vi_pham.loai_loi tho DVBH gui (vd "Loi 120 phut") thi tooltip moi tra ra dung mo ta -
+// doi chieu qua cot ten loi hien trong "Tat ca vi pham"/card cua KTV neu can loai moi chua co san.
+function QuanLyLoaiLoi() {
+  const { map, reload } = useLoaiLoiMap();
+  const rows = Object.values(map).sort((a, b) => a.ten_hien_thi.localeCompare(b.ten_hien_thi, "vi"));
+
+  const [editingMa, setEditingMa] = useState<string | null>(null);
+  const [editTen, setEditTen] = useState("");
+  const [editMoTa, setEditMoTa] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [newMa, setNewMa] = useState("");
+  const [newTen, setNewTen] = useState("");
+  const [newMoTa, setNewMoTa] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  function startEdit(row: LoaiLoiDinhNghia) {
+    setEditingMa(row.ma);
+    setEditTen(row.ten_hien_thi);
+    setEditMoTa(row.mo_ta);
+  }
+
+  async function saveEdit(ma: string) {
+    if (!editTen.trim() || !editMoTa.trim()) return;
+    setSavingEdit(true);
+    try {
+      await api.patch(`/loai-loi/${encodeURIComponent(ma)}`, { ten_hien_thi: editTen.trim(), mo_ta: editMoTa.trim() });
+      setEditingMa(null);
+      reload();
+    } catch {
+      alert("Cập nhật thất bại - vui lòng thử lại.");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function handleAdd() {
+    if (!newMa.trim() || !newTen.trim() || !newMoTa.trim()) return;
+    setAdding(true);
+    try {
+      await api.post("/loai-loi", { ma: newMa.trim(), ten_hien_thi: newTen.trim(), mo_ta: newMoTa.trim() });
+      setNewMa("");
+      setNewTen("");
+      setNewMoTa("");
+      setShowAdd(false);
+      reload();
+    } catch (err) {
+      alert(err instanceof ApiError && err.code === "DA_TON_TAI" ? "Mã lỗi này đã tồn tại." : "Thêm thất bại - vui lòng thử lại.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleDelete(ma: string) {
+    if (!confirm("Xóa mô tả loại lỗi này? (không ảnh hưởng các vi phạm đã ghi nhận, chỉ ẩn dấu (?) mô tả)")) return;
+    try {
+      await api.delete(`/loai-loi/${encodeURIComponent(ma)}`);
+      reload();
+    } catch {
+      alert("Xóa thất bại - vui lòng thử lại.");
+    }
+  }
+
+  return (
+    <div>
+      <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <HelpCircle size={15} /> Loại lỗi &amp; mô tả
+      </div>
+      <div className="card">
+        <div className="card-meta" style={{ marginBottom: 10 }}>
+          Nội dung ở đây hiện khi KTV bấm dấu (?) cạnh tên lỗi trên card vi phạm.
+        </div>
+        {rows.map((row) => {
+          const isEditing = editingMa === row.ma;
+          return (
+            <div key={row.ma} className="card" style={{ marginBottom: 8 }}>
+              {isEditing ? (
+                <div>
+                  <div className="field" style={{ marginBottom: 8 }}>
+                    <label className="field-label">Tên hiển thị</label>
+                    <input type="text" value={editTen} onChange={(e) => setEditTen(e.target.value)} />
+                  </div>
+                  <div className="field" style={{ marginBottom: 8 }}>
+                    <label className="field-label">Mô tả</label>
+                    <textarea rows={3} value={editMoTa} onChange={(e) => setEditMoTa(e.target.value)} />
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-primary btn-sm" disabled={savingEdit} onClick={() => saveEdit(row.ma)}>
+                      {savingEdit ? "Đang lưu..." : "Lưu"}
+                    </button>
+                    <button className="btn btn-sm" disabled={savingEdit} onClick={() => setEditingMa(null)}>
+                      Hủy
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="card-title">{row.ten_hien_thi}</div>
+                      <div className="card-meta" style={{ marginBottom: 6 }}>
+                        <span>Mã khớp: {row.ma}</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: "var(--ink-600)" }}>{row.mo_ta}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button className="btn btn-sm" onClick={() => startEdit(row)} aria-label="Sửa">
+                        <Pencil size={14} />
+                      </button>
+                      <button className="btn btn-sm" onClick={() => handleDelete(row.ma)} aria-label="Xóa">
+                        Xóa
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {rows.length === 0 && <div className="empty-state">Chưa có loại lỗi nào được mô tả.</div>}
+
+        {showAdd ? (
+          <div className="card" style={{ marginTop: 8 }}>
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label className="field-label">Mã lỗi (khớp đúng "loại lỗi" DVBH gửi sang, vd: Loi 120 phut)</label>
+              <input type="text" value={newMa} onChange={(e) => setNewMa(e.target.value)} placeholder="Loi 120 phut" />
+            </div>
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label className="field-label">Tên hiển thị</label>
+              <input type="text" value={newTen} onChange={(e) => setNewTen(e.target.value)} placeholder="Lỗi 120 phút" />
+            </div>
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label className="field-label">Mô tả</label>
+              <textarea rows={3} value={newMoTa} onChange={(e) => setNewMoTa(e.target.value)} placeholder="Giải thích lỗi này để KTV hiểu rõ..." />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-primary btn-sm" disabled={adding} onClick={handleAdd}>
+                {adding ? "Đang lưu..." : "Thêm"}
+              </button>
+              <button className="btn btn-sm" disabled={adding} onClick={() => setShowAdd(false)}>
+                Hủy
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button className="btn btn-sm" style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }} onClick={() => setShowAdd(true)}>
+            <Plus size={14} /> Thêm loại lỗi
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AdminScreen() {
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null);
   const [ktvStatus, setKtvStatus] = useState<KtvDirectoryStatus | null>(null);
@@ -379,6 +542,8 @@ export function AdminScreen() {
         )}
       </div>
 
+      <QuanLyLoaiLoi />
+
       <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <AlertTriangle size={15} /> Chưa xác định KTV {chuaXacDinhTotal > 0 && <span className="badge">{chuaXacDinhTotal}</span>}
       </div>
@@ -390,7 +555,10 @@ export function AdminScreen() {
         <>
           {chuaXacDinh.map((vp) => (
             <div key={vp.id} className="card">
-              <div className="card-title">{loaiLoiLabel(vp.loai_loi)}</div>
+              <div className="card-title card-title-row">
+                {loaiLoiLabel(vp.loai_loi)}
+                <LoaiLoiHelp maLoi={vp.loai_loi} tenHienThi={loaiLoiLabel(vp.loai_loi)} />
+              </div>
               <div className="card-meta" style={{ marginBottom: 10 }}>
                 {vp.case_id && <span>Case: {vp.case_id}</span>}
                 <span>Tên KTV (thô từ DVBH): {vp.ky_thuat_vien_ten || "(trống)"}</span>
