@@ -19,6 +19,15 @@ async function getMaKtvForEmail(db: D1Database, email: string): Promise<string |
   return row?.ma_ktv ?? null;
 }
 
+/** Admin duoc XEM (khong phai nop ho) vi pham cua BAT KY KTV nao - xem phan hoi nguoi dung "cho
+ * phep click vao card vi pham de xem noi dung ben trong nhu ktv dang xem". Chi ap dung cho cac
+ * route GET/doc du lieu (chi tiet, case-lookup) - POST .../anh va .../giai-trinh VAN chi chu so
+ * huu moi goi duoc, Admin khong nop giai trinh thay KTV. */
+function duocXemViPham(vaiTro: "Admin" | null, maKtv: string | null, chuSoHuu: string | null): boolean {
+  if (vaiTro === "Admin") return true;
+  return !!maKtv && maKtv === chuSoHuu;
+}
+
 interface ViPhamRow {
   id: string;
   case_id: string | null;
@@ -122,7 +131,8 @@ giaiTrinh.get("/vi-pham", async (c) => {
 });
 
 // GET /vi-pham/:id - chi tiet 1 vi pham, kem giai trinh da nop (neu co) - 403 neu khong phai vi
-// pham cua chinh minh (khong duoc xem cua KTV khac).
+// pham cua chinh minh VA khong phai Admin (xem duocXemViPham() - Admin xem duoc CUA BAT KY KTV nao,
+// KTV thuong chi xem duoc cua chinh minh).
 giaiTrinh.get("/vi-pham/:id", async (c) => {
   const user = c.get("user");
   const maKtv = await getMaKtvForEmail(c.env.DB, user.email);
@@ -140,7 +150,7 @@ giaiTrinh.get("/vi-pham/:id", async (c) => {
     .bind(id)
     .first<ViPhamRow & { ky_thuat_vien_ma_ktv: string | null }>();
   if (!viPham) return c.json({ error: "NOT_FOUND" }, 404);
-  if (!maKtv || viPham.ky_thuat_vien_ma_ktv !== maKtv) return c.json({ error: "FORBIDDEN" }, 403);
+  if (!duocXemViPham(user.vai_tro, maKtv, viPham.ky_thuat_vien_ma_ktv)) return c.json({ error: "FORBIDDEN" }, 403);
 
   const giaiTrinhRows = await c.env.DB.prepare("SELECT * FROM vi_pham_giai_trinh WHERE vi_pham_id = ? ORDER BY tao_luc DESC").bind(id).all();
 
@@ -157,7 +167,7 @@ giaiTrinh.get("/vi-pham/:id/case-lookup", async (c) => {
 
   const viPham = await c.env.DB.prepare("SELECT case_id, ky_thuat_vien_ma_ktv FROM vi_pham WHERE id = ?").bind(id).first<{ case_id: string | null; ky_thuat_vien_ma_ktv: string | null }>();
   if (!viPham) return c.json({ error: "NOT_FOUND" }, 404);
-  if (!maKtv || viPham.ky_thuat_vien_ma_ktv !== maKtv) return c.json({ error: "FORBIDDEN" }, 403);
+  if (!duocXemViPham(user.vai_tro, maKtv, viPham.ky_thuat_vien_ma_ktv)) return c.json({ error: "FORBIDDEN" }, 403);
   if (!viPham.case_id) return c.json({ cached: null });
 
   const cached = await getCachedCaseLookup(c.env.DB, viPham.case_id);
@@ -174,7 +184,7 @@ giaiTrinh.post("/vi-pham/:id/case-lookup/sync", async (c) => {
 
   const viPham = await c.env.DB.prepare("SELECT case_id, ky_thuat_vien_ma_ktv FROM vi_pham WHERE id = ?").bind(id).first<{ case_id: string | null; ky_thuat_vien_ma_ktv: string | null }>();
   if (!viPham) return c.json({ error: "NOT_FOUND" }, 404);
-  if (!maKtv || viPham.ky_thuat_vien_ma_ktv !== maKtv) return c.json({ error: "FORBIDDEN" }, 403);
+  if (!duocXemViPham(user.vai_tro, maKtv, viPham.ky_thuat_vien_ma_ktv)) return c.json({ error: "FORBIDDEN" }, 403);
   if (!viPham.case_id) return c.json({ error: "NO_CASE_ID" }, 400);
 
   const outcome = await syncCaseLookup(c.env, c.env.DB, user.email, viPham.case_id);

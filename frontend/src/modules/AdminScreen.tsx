@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HardDrive, Users, AlertTriangle, UserCog, ListChecks, HelpCircle, Plus, Pencil } from "lucide-react";
+import { HardDrive, Users, AlertTriangle, UserCog, ListChecks, HelpCircle, Plus, Pencil, ChevronRight } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import type { AppUser, KetQuaCap1DinhNghia, KtvOption, LoaiLoiDinhNghia, ViPham } from "../types";
 import { loaiLoiLabel } from "../lib/format";
@@ -8,6 +8,7 @@ import { KtvCombobox } from "../components/KtvCombobox";
 import { LoaiLoiHelp } from "../components/LoaiLoiHelp";
 import { useLoaiLoiMap } from "../contexts/LoaiLoiContext";
 import { useKetQuaCap1Map } from "../contexts/KetQuaCap1Context";
+import { ViPhamDetailScreen } from "./ViPhamDetailScreen";
 
 interface DriveStatus {
   connected: boolean;
@@ -40,10 +41,12 @@ const TRANG_THAI_OPTIONS = [
 
 // Muc Admin: xem TOAN BO vi pham he thong (khong loc theo nguoi dang nhap nhu man KTV) - thieu
 // phan nay Admin chi thay duoc hang doi "chua xac dinh KTV", khong co cach nao xem tong quan toan
-// he (xem phan hoi nguoi dung "admin co nhin thay toan bo khong?"). Khong cho click vao chi tiet vi
-// backend GET /giai-trinh/vi-pham/:id chi cho phep chinh chu KTV xem (403 neu Admin xem ho - dung y
-// thiet ke rieng tu, khong mo rong o day).
-function TatCaViPham({ ktvOptions }: { ktvOptions: KtvOption[] }) {
+// he (xem phan hoi nguoi dung "admin co nhin thay toan bo khong?"). Card bam duoc de xem chi tiet
+// (readOnly, giong KTV dang xem - xem phan hoi nguoi dung "cho phep click vao card vi pham de xem
+// noi dung ben trong nhu ktv dang xem") - backend GET /giai-trinh/vi-pham/:id da mo cho Admin xem
+// CUA BAT KY KTV nao (xem duocXemViPham() trong routes/giaiTrinh.ts), rieng nop giai trinh thay KTV
+// van KHONG duoc phep.
+function TatCaViPham({ ktvOptions, onSelect }: { ktvOptions: KtvOption[]; onSelect: (id: string) => void }) {
   const [maKtv, setMaKtv] = useState("");
   const [trangThai, setTrangThai] = useState("");
   const [search, setSearch] = useState("");
@@ -120,7 +123,7 @@ function TatCaViPham({ ktvOptions }: { ktvOptions: KtvOption[] }) {
         ) : (
           <>
             {data.rows.map((vp) => (
-              <div key={vp.id} className="card" style={{ marginBottom: 8 }}>
+              <div key={vp.id} className="card card-clickable" style={{ marginBottom: 8 }} onClick={() => onSelect(vp.id)}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 700, marginBottom: 2 }}>#{vp.id}</div>
@@ -136,7 +139,10 @@ function TatCaViPham({ ktvOptions }: { ktvOptions: KtvOption[] }) {
                       <span>{vp.ngay_ghi_nhan}</span>
                     </div>
                   </div>
-                  <StatusBadge vp={vp} />
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+                    <StatusBadge vp={vp} />
+                    <ChevronRight size={18} color="var(--ink-400)" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -597,6 +603,7 @@ function QuanLyKetQuaCap1() {
 }
 
 export function AdminScreen() {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null);
   const [ktvStatus, setKtvStatus] = useState<KtvDirectoryStatus | null>(null);
 
@@ -668,6 +675,12 @@ export function AdminScreen() {
   }
 
   const chuaXacDinhTotalPages = Math.max(1, Math.ceil(chuaXacDinhTotal / CHUA_XAC_DINH_PAGE_SIZE));
+
+  // Admin bam vao 1 card trong "Tat ca vi pham" -> xem chi tiet READ-ONLY (giong KTV dang xem, xem
+  // phan hoi nguoi dung) thay vi toan bo dashboard Admin - back() quay lai dashboard, KHONG doi tab.
+  if (selectedId) {
+    return <ViPhamDetailScreen id={selectedId} onBack={() => setSelectedId(null)} readOnly />;
+  }
 
   return (
     <div className="narrow">
@@ -772,7 +785,7 @@ export function AdminScreen() {
         </>
       )}
 
-      <TatCaViPham ktvOptions={ktvOptions} />
+      <TatCaViPham ktvOptions={ktvOptions} onSelect={setSelectedId} />
       <QuanLyTaiKhoan />
     </div>
   );
