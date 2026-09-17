@@ -54,6 +54,9 @@ adminViPham.get("/vi-pham/tat-ca", async (c) => {
   const maKtv = c.req.query("ma_ktv")?.trim();
   const trangThai = c.req.query("trang_thai")?.trim();
   const search = c.req.query("search")?.trim();
+  // ID duoc hien thi voi dau # (vd #L-023608) nhung luu trong DB khong co dau #.
+  // Chuan hoa de tim duoc ca hai cach nhap.
+  const searchValue = search?.replace(/^#/, "");
   const page = Math.max(1, Number(c.req.query("page")) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(c.req.query("pageSize")) || 50));
   const offset = (page - 1) * pageSize;
@@ -65,9 +68,9 @@ adminViPham.get("/vi-pham/tat-ca", async (c) => {
     conditions.push("vp.ky_thuat_vien_ma_ktv = ?");
     binds.push(maKtv);
   }
-  if (search) {
-    conditions.push("(LOWER(COALESCE(vp.case_id,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.khach_hang,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.seri_san_pham,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.ky_thuat_vien_ten,'')) LIKE LOWER(?))");
-    binds.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+  if (searchValue) {
+    conditions.push("(LOWER(COALESCE(vp.id,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.case_id,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.khach_hang,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.seri_san_pham,'')) LIKE LOWER(?) OR LOWER(COALESCE(vp.ky_thuat_vien_ten,'')) LIKE LOWER(?))");
+    binds.push(`%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`, `%${searchValue}%`);
   }
   // 4 trang thai khop DUNG logic components/StatusBadge.tsx ben frontend (viPhamStatus()) - viet lai
   // bang EXISTS truc tiep vi SQLite khong cho WHERE tham chieu alias cua chinh SELECT do. Thu tu uu
