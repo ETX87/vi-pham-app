@@ -130,6 +130,58 @@ giaiTrinh.get("/vi-pham", async (c) => {
   });
 });
 
+// GET /bao-cao?thang=YYYY-MM - bao cao nhanh cua CHINH KTV dang dang nhap cho 1 thang (mac dinh
+// thang hien tai neu bo qua "thang") - loc theo ngay_ghi_nhan (thang vi pham PHAT SINH, khong phai
+// thang chot). "thongKe" la 4 nhom loai tru lan nhau/cong du tong (dang_cho = chua chot VA chua qua
+// han, gop chung 2 trang thai "chua giai trinh" + "cho chot loi" vi ca 2 deu la "dang xu ly, chua co
+// ket luan" tu goc nhin bao cao thang - qua_han tach rieng vi la tin hieu can chu y). "theoLoaiLoi"
+// CHI tinh tren nhung vi pham DA CHOT LA LOI THAT (chot_bo_cap_2 = 1) trong thang do, ty_le = %
+// tren tong so da_chot (khop dung yeu cau "sl va ty le loi theo loi DA CHOT").
+giaiTrinh.get("/bao-cao", async (c) => {
+  const user = c.get("user");
+  const maKtv = await getMaKtvForEmail(c.env.DB, user.email);
+  const thang = /^\d{4}-\d{2}$/.test(c.req.query("thang") ?? "") ? c.req.query("thang")! : todayVN().slice(0, 7);
+
+  if (!maKtv) {
+    return c.json({ thang, thongKe: { tong: 0, dangCho: 0, quaHan: 0, daChot: 0, daBo: 0 }, theoLoaiLoi: [] });
+  }
+
+  const thongKeRow = await c.env.DB.prepare(
+    `SELECT
+        COUNT(*) as tong,
+        SUM(CASE WHEN chot_bo_cap_2 IS NULL AND ngay_ghi_nhan < datetime(${SQL_NOW_VN}, '-48 hours') THEN 1 ELSE 0 END) as qua_han,
+        SUM(CASE WHEN chot_bo_cap_2 = 1 THEN 1 ELSE 0 END) as da_chot,
+        SUM(CASE WHEN chot_bo_cap_2 = 0 THEN 1 ELSE 0 END) as da_bo
+     FROM vi_pham WHERE ky_thuat_vien_ma_ktv = ? AND substr(ngay_ghi_nhan, 1, 7) = ?`,
+  )
+    .bind(maKtv, thang)
+    .first<{ tong: number; qua_han: number; da_chot: number; da_bo: number }>();
+
+  const tong = thongKeRow?.tong ?? 0;
+  const quaHan = thongKeRow?.qua_han ?? 0;
+  const daChot = thongKeRow?.da_chot ?? 0;
+  const daBo = thongKeRow?.da_bo ?? 0;
+  const dangCho = Math.max(0, tong - quaHan - daChot - daBo);
+
+  const { results: loaiLoiRows } = await c.env.DB.prepare(
+    `SELECT vp.loai_loi, COALESCE(ll.ten_hien_thi, vp.loai_loi) as ten_hien_thi, COUNT(*) as so_luong
+     FROM vi_pham vp LEFT JOIN loai_loi_mo_ta ll ON ll.ma = vp.loai_loi
+     WHERE vp.ky_thuat_vien_ma_ktv = ? AND substr(vp.ngay_ghi_nhan, 1, 7) = ? AND vp.chot_bo_cap_2 = 1
+     GROUP BY vp.loai_loi, ten_hien_thi ORDER BY so_luong DESC`,
+  )
+    .bind(maKtv, thang)
+    .all<{ loai_loi: string; ten_hien_thi: string; so_luong: number }>();
+
+  const theoLoaiLoi = loaiLoiRows.map((r) => ({
+    loaiLoi: r.loai_loi,
+    tenHienThi: r.ten_hien_thi,
+    soLuong: r.so_luong,
+    tyLe: daChot > 0 ? Math.round((r.so_luong / daChot) * 1000) / 10 : 0,
+  }));
+
+  return c.json({ thang, thongKe: { tong, dangCho, quaHan, daChot, daBo }, theoLoaiLoi });
+});
+
 // GET /vi-pham/:id - chi tiet 1 vi pham, kem giai trinh da nop (neu co) - 403 neu khong phai vi
 // pham cua chinh minh VA khong phai Admin (xem duocXemViPham() - Admin xem duoc CUA BAT KY KTV nao,
 // KTV thuong chi xem duoc cua chinh minh).

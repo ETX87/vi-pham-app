@@ -1,6 +1,6 @@
-import { ClipboardList, Bell, Settings, User } from "lucide-react";
+import { ClipboardList, Bell, Settings, User, BarChart3 } from "lucide-react";
 
-export type MobileTab = "vi-pham" | "thong-bao" | "admin" | "tai-khoan";
+export type MobileTab = "vi-pham" | "bao-cao" | "thong-bao" | "admin" | "tai-khoan";
 
 interface TabDef {
   key: MobileTab;
@@ -27,6 +27,7 @@ export function BottomTabBar({
 }) {
   const tabs: TabDef[] = [
     { key: "vi-pham", label: "Vi phạm", icon: <ClipboardList size={22} />, badge: viPhamBadge },
+    { key: "bao-cao", label: "Báo cáo", icon: <BarChart3 size={22} /> },
     { key: "thong-bao", label: "Thông báo", icon: <Bell size={22} />, badge: thongBaoBadge },
     ...(isAdmin ? [{ key: "admin" as const, label: "Quản trị", icon: <Settings size={22} /> }] : []),
     { key: "tai-khoan", label: "Tài khoản", icon: <User size={22} /> },

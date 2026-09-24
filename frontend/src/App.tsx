@@ -4,6 +4,7 @@ import { useAuth } from "./auth/AuthContext";
 import { Avatar } from "./components/Avatar";
 import { LoginScreen } from "./login/LoginScreen";
 import { ViPhamListScreen } from "./modules/ViPhamListScreen";
+import { BaoCaoScreen } from "./modules/BaoCaoScreen";
 import { ViPhamDetailScreen } from "./modules/ViPhamDetailScreen";
 import { NotificationsScreen } from "./modules/NotificationsScreen";
 import { AdminScreen } from "./modules/AdminScreen";
@@ -103,6 +104,9 @@ function MainApp() {
           >
             Vi phạm của tôi {viPhamBadge > 0 && <span className="badge">{viPhamBadge}</span>}
           </button>
+          <button className={`topbar-tab ${tab === "bao-cao" ? "active" : ""}`} onClick={() => setTab("bao-cao")}>
+            Báo cáo nhanh
+          </button>
           <button className={`topbar-tab ${tab === "thong-bao" ? "active" : ""}`} onClick={() => setTab("thong-bao")}>
             Thông báo {thongBaoBadge > 0 && <span className="badge">{thongBaoBadge}</span>}
           </button>
@@ -139,6 +143,8 @@ function MainApp() {
       <div className="main">
         {tab === "admin" && isAdmin ? (
           <AdminScreen />
+        ) : tab === "bao-cao" ? (
+          <BaoCaoScreen />
         ) : tab === "thong-bao" ? (
           <NotificationsScreen onSelectViPham={goToViPham} onChanged={refreshBadges} />
         ) : tab === "tai-khoan" ? (
