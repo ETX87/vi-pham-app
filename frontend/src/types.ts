@@ -5,6 +5,10 @@ export interface AppUser {
   trang_thai_duyet: "Cho duyet" | "Da duyet" | "Tu choi";
   bi_khoa: boolean;
   ma_ktv_tu_khai?: string | null;
+  // KTV THAT SU dang khop voi email nay (LEFT JOIN ktv_lien_he.email_dang_nhap = users.email) - NULL
+  // nghia la chua co KTV nao trong danh ba dung email nay de dang nhap (xem routes/adminUsers.ts).
+  khop_ma_ktv?: string | null;
+  khop_ten_ktv?: string | null;
 }
 
 export interface ViPham {

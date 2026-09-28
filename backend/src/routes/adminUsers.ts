@@ -28,17 +28,23 @@ adminUsers.get("/", async (c) => {
   const binds: unknown[] = [];
 
   if (TAB_TRANG_THAI[tab]) {
-    conditions.push("trang_thai_duyet = ?");
+    conditions.push("u.trang_thai_duyet = ?");
     binds.push(TAB_TRANG_THAI[tab]);
   }
   if (search) {
-    conditions.push("(LOWER(email) LIKE LOWER(?) OR LOWER(COALESCE(ten,'')) LIKE LOWER(?) OR LOWER(COALESCE(ma_ktv_tu_khai,'')) LIKE LOWER(?))");
+    conditions.push("(LOWER(u.email) LIKE LOWER(?) OR LOWER(COALESCE(u.ten,'')) LIKE LOWER(?) OR LOWER(COALESCE(u.ma_ktv_tu_khai,'')) LIKE LOWER(?))");
     binds.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
+  // LEFT JOIN ktv_lien_he theo email_dang_nhap - CHINH la dieu kien khop tu dong duyet/gan KTV that
+  // su dung (xem giaiTrinh.ts getMaKtvForEmail()), khac voi ma_ktv_tu_khai (chi la nguoi dung TU KHAI,
+  // khong rang buoc gi) - hien ca 2 de Admin phan biet "da khop that" voi "KTV tu dien nhung chua khop".
   const { results } = await c.env.DB.prepare(
-    `SELECT email, ten, vai_tro, trang_thai_duyet, bi_khoa, created_at, ma_ktv_tu_khai FROM users ${where} ORDER BY created_at DESC`,
+    `SELECT u.email, u.ten, u.vai_tro, u.trang_thai_duyet, u.bi_khoa, u.created_at, u.ma_ktv_tu_khai,
+            k.ma_ktv as khop_ma_ktv, k.ten_hien_thi as khop_ten_ktv
+     FROM users u LEFT JOIN ktv_lien_he k ON k.email_dang_nhap = u.email
+     ${where} ORDER BY u.created_at DESC`,
   )
     .bind(...binds)
     .all<{
@@ -49,6 +55,8 @@ adminUsers.get("/", async (c) => {
       bi_khoa: number;
       created_at: string;
       ma_ktv_tu_khai: string | null;
+      khop_ma_ktv: string | null;
+      khop_ten_ktv: string | null;
     }>();
   // bi_khoa la INTEGER 0/1 trong D1 - ep ve boolean that de khop dung contract AppUser.bi_khoa ben
   // frontend (xem middleware/loadUser.ts lam tuong tu cho endpoint /me).

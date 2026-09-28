@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HardDrive, Users, AlertTriangle, UserCog, ListChecks, HelpCircle, Plus, Pencil, ChevronRight } from "lucide-react";
+import { HardDrive, Users, AlertTriangle, UserCog, ListChecks, HelpCircle, Plus, Pencil, ChevronRight, ExternalLink } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import type { AppUser, KetQuaCap1DinhNghia, KtvOption, LoaiLoiDinhNghia, ViPham } from "../types";
 import { loaiLoiLabel } from "../lib/format";
@@ -176,6 +176,15 @@ const TAI_KHOAN_TAB_OPTIONS: { value: "cho-duyet" | "da-duyet" | "tu-choi" | "ta
   { value: "tat-ca", label: "Tất cả" },
 ];
 
+// Danh ba KTV (ktv_lien_he) o vi-pham-app CHI la cache doc-only, bi linh-kien-app ghi de toan bo moi
+// gio - gan/doi lai email_dang_nhap PHAI sua tai nguon (linh-kien-app), khong the sua tam thoi o day
+// (se mat trong vong 1 tieng khi cron sync tiep theo chay). Nut duoi day chi MO SANG dung tab "KTV
+// hien truong" cua linh-kien-app, tim san theo email de Admin sua nhanh, khong tu ghi gi ca.
+const LINH_KIEN_APP_URL = "https://linhkien.dichvu3t.workers.dev";
+function moLinkSuaKtv(email: string) {
+  window.open(`${LINH_KIEN_APP_URL}/?ktvSearch=${encodeURIComponent(email)}`, "_blank", "noopener,noreferrer");
+}
+
 function QuanLyTaiKhoan() {
   const [tab, setTab] = useState<"cho-duyet" | "da-duyet" | "tu-choi" | "tat-ca">("cho-duyet");
   const [search, setSearch] = useState("");
@@ -252,10 +261,22 @@ function QuanLyTaiKhoan() {
                         <span>Mã KTV tự khai: {u.ma_ktv_tu_khai}</span>
                       </div>
                     )}
+                    <div style={{ marginTop: 6 }}>
+                      {u.khop_ma_ktv ? (
+                        <span className="tag tag-done">
+                          Đang khớp KTV: {u.khop_ten_ktv || u.khop_ma_ktv} ({u.khop_ma_ktv})
+                        </span>
+                      ) : (
+                        <span className="tag tag-pending">Chưa khớp KTV nào trong danh bạ</span>
+                      )}
+                    </div>
                   </div>
                   <span className={`tag ${st.cls}`}>{st.label}</span>
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  <button className="btn btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={() => moLinkSuaKtv(u.email)}>
+                    <ExternalLink size={13} /> {u.khop_ma_ktv ? "Gán lại KTV" : "Gán KTV"} (Đặt mua linh kiện)
+                  </button>
                   {u.trang_thai_duyet !== "Da duyet" && (
                     <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => patch(u.email, { trang_thai_duyet: "Da duyet" })}>
                       Duyệt
