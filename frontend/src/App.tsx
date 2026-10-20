@@ -25,18 +25,22 @@ function MainApp() {
   const [viPhamBadge, setViPhamBadge] = useState(0);
   const [thongBaoBadge, setThongBaoBadge] = useState(0);
 
+  // Badge "Thong bao" gop CHUNG 2 nguon (su kien vi pham tu dong + thong bao cong ty Admin soan,
+  // xem migration 0009) vi UI gop ca 2 vao 1 tab duy nhat (xem NotificationsScreen.tsx) - nguoi
+  // dung chi can biet "co gi moi can doc" o 1 cho, khong can phan biet nguon luc nhin bottom-bar.
   function refreshBadges() {
     api.get<{ chuaXuLy: number }>("/giai-trinh/vi-pham").then((r) => setViPhamBadge(r.chuaXuLy)).catch(() => {});
-    api
-      .get<{ chuaDoc: number }>("/giai-trinh/thong-bao")
-      .then((r) => {
-        setThongBaoBadge(r.chuaDoc);
-        // Icon PWA tren man hinh chinh (Badging API) - chi Chrome/Edge (desktop + Android) ho tro
-        // sau khi cai dat, KHONG co tren iOS Safari. Dung dung so "chua doc" giong chuong thong bao.
-        if (r.chuaDoc > 0) navigator.setAppBadge?.(r.chuaDoc).catch(() => {});
-        else navigator.clearAppBadge?.().catch(() => {});
-      })
-      .catch(() => {});
+    Promise.all([
+      api.get<{ chuaDoc: number }>("/giai-trinh/thong-bao").catch(() => ({ chuaDoc: 0 })),
+      api.get<{ chuaDoc: number }>("/giai-trinh/thong-bao-cong-ty").catch(() => ({ chuaDoc: 0 })),
+    ]).then(([a, b]) => {
+      const tong = a.chuaDoc + b.chuaDoc;
+      setThongBaoBadge(tong);
+      // Icon PWA tren man hinh chinh (Badging API) - chi Chrome/Edge (desktop + Android) ho tro
+      // sau khi cai dat, KHONG co tren iOS Safari. Dung dung so "chua doc" giong chuong thong bao.
+      if (tong > 0) navigator.setAppBadge?.(tong).catch(() => {});
+      else navigator.clearAppBadge?.().catch(() => {});
+    });
   }
 
   useEffect(refreshBadges, []);

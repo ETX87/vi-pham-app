@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { HardDrive, Users, AlertTriangle, UserCog, ListChecks, HelpCircle, Plus, Pencil, ChevronRight, ExternalLink } from "lucide-react";
+import { HardDrive, Users, AlertTriangle, UserCog, ListChecks, HelpCircle, Plus, Pencil, ChevronRight, ExternalLink, Megaphone, Send } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import type { AppUser, KetQuaCap1DinhNghia, KtvOption, LoaiLoiDinhNghia, ViPham } from "../types";
 import { loaiLoiLabel } from "../lib/format";
 import { StatusBadge } from "../components/StatusBadge";
 import { KtvCombobox } from "../components/KtvCombobox";
 import { LoaiLoiHelp } from "../components/LoaiLoiHelp";
+import { Modal } from "../components/Modal";
 import { useLoaiLoiMap } from "../contexts/LoaiLoiContext";
 import { useKetQuaCap1Map } from "../contexts/KetQuaCap1Context";
 import { ViPhamDetailScreen } from "./ViPhamDetailScreen";
@@ -623,6 +624,216 @@ function QuanLyKetQuaCap1() {
   );
 }
 
+interface ThongBaoCongTyRow {
+  id: number;
+  tieu_de: string;
+  noi_dung: string;
+  nguoi_tao: string;
+  tao_luc: string;
+  tongNguoiNhan: number;
+  daDoc: number;
+}
+
+interface NguoiNhanRow {
+  email: string;
+  ten: string | null;
+  da_doc_luc: string | null;
+}
+
+// Muc Admin: soan + gui thong bao cong ty toi nguoi nhan TU CHON (khac broadcast toan bo mac dinh -
+// xem phan hoi nguoi dung "chon nguoi nhan khi soan", migration 0009 + routes/adminThongBaoCongTy.ts).
+// Danh sach nguoi nhan de chon lay tu "/admin/users?tab=da-duyet" (endpoint da co san cho
+// QuanLyTaiKhoan o duoi) - chi nguoi dang hoat dong moi chon duoc, tranh gui nham toi tai khoan
+// chua duyet/da khoa.
+function QuanLyThongBaoCongTy() {
+  const [danhSach, setDanhSach] = useState<ThongBaoCongTyRow[] | null>(null);
+  const [xemRoster, setXemRoster] = useState<ThongBaoCongTyRow | null>(null);
+  const [roster, setRoster] = useState<NguoiNhanRow[] | null>(null);
+
+  const [showSoan, setShowSoan] = useState(false);
+  const [tieuDe, setTieuDe] = useState("");
+  const [noiDung, setNoiDung] = useState("");
+  const [ungVien, setUngVien] = useState<AppUser[] | null>(null);
+  const [daChon, setDaChon] = useState<Set<string>>(new Set());
+  const [timNguoiNhan, setTimNguoiNhan] = useState("");
+  const [sending, setSending] = useState(false);
+
+  function loadDanhSach() {
+    setDanhSach(null);
+    api
+      .get<{ rows: ThongBaoCongTyRow[] }>("/admin/thong-bao-cong-ty")
+      .then((r) => setDanhSach(r.rows))
+      .catch(() => setDanhSach([]));
+  }
+
+  useEffect(loadDanhSach, []);
+
+  function openSoan() {
+    setShowSoan(true);
+    setTieuDe("");
+    setNoiDung("");
+    setDaChon(new Set());
+    setTimNguoiNhan("");
+    if (!ungVien) {
+      api
+        .get<{ rows: AppUser[] }>("/admin/users?tab=da-duyet")
+        .then((r) => setUngVien(r.rows))
+        .catch(() => setUngVien([]));
+    }
+  }
+
+  function toggleChon(email: string) {
+    setDaChon((prev) => {
+      const next = new Set(prev);
+      if (next.has(email)) next.delete(email);
+      else next.add(email);
+      return next;
+    });
+  }
+
+  const ungVienLoc = (ungVien ?? []).filter((u) => {
+    const q = timNguoiNhan.trim().toLowerCase();
+    if (!q) return true;
+    return u.email.toLowerCase().includes(q) || (u.ten ?? "").toLowerCase().includes(q);
+  });
+
+  async function handleGui() {
+    if (!tieuDe.trim() || !noiDung.trim() || daChon.size === 0) return;
+    if (!confirm(`Gửi thông báo này tới ${daChon.size} người? Không thể sửa/xóa sau khi gửi.`)) return;
+    setSending(true);
+    try {
+      await api.post("/admin/thong-bao-cong-ty", { tieu_de: tieuDe.trim(), noi_dung: noiDung.trim(), nguoi_nhan: [...daChon] });
+      setShowSoan(false);
+      loadDanhSach();
+    } catch {
+      alert("Gửi thông báo thất bại - vui lòng thử lại.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function moRoster(row: ThongBaoCongTyRow) {
+    setXemRoster(row);
+    setRoster(null);
+    api
+      .get<{ rows: NguoiNhanRow[] }>(`/admin/thong-bao-cong-ty/${row.id}/nguoi-nhan`)
+      .then((r) => setRoster(r.rows))
+      .catch(() => setRoster([]));
+  }
+
+  return (
+    <div>
+      <div className="section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Megaphone size={15} /> Thông báo công ty
+        </span>
+        <button className="btn btn-primary btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={openSoan}>
+          <Plus size={14} /> Soạn thông báo
+        </button>
+      </div>
+
+      {danhSach === null ? (
+        <div className="loading-state">Đang tải...</div>
+      ) : danhSach.length === 0 ? (
+        <div className="empty-state">Chưa gửi thông báo công ty nào.</div>
+      ) : (
+        danhSach.map((row) => (
+          <div key={row.id} className="card card-clickable" style={{ marginBottom: 8 }} onClick={() => moRoster(row)}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div className="card-title">{row.tieu_de}</div>
+                <div className="card-meta" style={{ marginTop: 4 }}>
+                  <span>{row.tao_luc}</span>
+                  <span>Đã đọc {row.daDoc}/{row.tongNguoiNhan}</span>
+                </div>
+              </div>
+              <ChevronRight size={18} color="var(--ink-400)" />
+            </div>
+          </div>
+        ))
+      )}
+
+      {showSoan && (
+        <Modal onClose={() => !sending && setShowSoan(false)}>
+          <div className="card-title" style={{ marginBottom: 10 }}>
+            Soạn thông báo công ty
+          </div>
+          <div className="field" style={{ marginBottom: 8 }}>
+            <label className="field-label">Tiêu đề</label>
+            <input type="text" value={tieuDe} onChange={(e) => setTieuDe(e.target.value)} />
+          </div>
+          <div className="field" style={{ marginBottom: 8 }}>
+            <label className="field-label">Nội dung</label>
+            <textarea rows={4} value={noiDung} onChange={(e) => setNoiDung(e.target.value)} />
+          </div>
+          <div className="field" style={{ marginBottom: 8 }}>
+            <label className="field-label">Người nhận ({daChon.size} đã chọn)</label>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+              <input
+                type="text"
+                placeholder="Tìm theo tên/email..."
+                value={timNguoiNhan}
+                onChange={(e) => setTimNguoiNhan(e.target.value)}
+                style={{ flex: "1 1 160px" }}
+              />
+              <button className="btn btn-sm" onClick={() => setDaChon(new Set(ungVienLoc.map((u) => u.email)))}>
+                Chọn tất cả
+              </button>
+              <button className="btn btn-sm" onClick={() => setDaChon(new Set())}>
+                Bỏ chọn tất cả
+              </button>
+            </div>
+            <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid var(--line)", borderRadius: 8, padding: 6 }}>
+              {ungVien === null ? (
+                <div className="loading-state">Đang tải...</div>
+              ) : ungVienLoc.length === 0 ? (
+                <div className="empty-state">Không tìm thấy nhân viên nào.</div>
+              ) : (
+                ungVienLoc.map((u) => (
+                  <label key={u.email} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 2px", cursor: "pointer" }}>
+                    <input type="checkbox" checked={daChon.has(u.email)} onChange={() => toggleChon(u.email)} />
+                    <span>{u.ten || u.email}</span>
+                    <span style={{ color: "var(--ink-400)", fontSize: 12 }}>{u.email}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+          <button
+            className="btn btn-primary btn-sm"
+            style={{ display: "flex", alignItems: "center", gap: 6 }}
+            disabled={sending || !tieuDe.trim() || !noiDung.trim() || daChon.size === 0}
+            onClick={handleGui}
+          >
+            <Send size={14} /> {sending ? "Đang gửi..." : `Gửi (${daChon.size})`}
+          </button>
+        </Modal>
+      )}
+
+      {xemRoster && (
+        <Modal onClose={() => setXemRoster(null)}>
+          <div className="card-title" style={{ marginBottom: 4 }}>
+            {xemRoster.tieu_de}
+          </div>
+          <div className="card-meta" style={{ marginBottom: 12 }}>
+            Đã đọc {xemRoster.daDoc}/{xemRoster.tongNguoiNhan}
+          </div>
+          {roster === null ? (
+            <div className="loading-state">Đang tải...</div>
+          ) : (
+            roster.map((r) => (
+              <div key={r.email} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--line)" }}>
+                <span>{r.ten || r.email}</span>
+                <span className={`tag ${r.da_doc_luc ? "tag-done" : "tag-pending"}`}>{r.da_doc_luc ? `Đã đọc lúc ${r.da_doc_luc}` : "Chưa đọc"}</span>
+              </div>
+            ))
+          )}
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 export function AdminScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null);
@@ -745,6 +956,7 @@ export function AdminScreen() {
         )}
       </div>
 
+      <QuanLyThongBaoCongTy />
       <QuanLyLoaiLoi />
       <QuanLyKetQuaCap1 />
 

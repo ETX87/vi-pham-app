@@ -368,4 +368,59 @@ giaiTrinh.post("/thong-bao/danh-dau-tat-ca-da-doc", async (c) => {
   return c.json({ ok: true });
 });
 
+const THONG_BAO_CONG_TY_PAGE_SIZE = 10;
+
+// GET /thong-bao-cong-ty?trang_thai=chua_doc|da_doc&page=1 - thong bao Admin soan + gui rieng toi
+// CHINH nguoi dang dang nhap (khac /thong-bao o tren - do la su kien vi pham tu dong, con day la
+// broadcast Admin tu chon nguoi nhan, xem migration 0009). Cung shape response de tai dung UI
+// pattern cua NotificationsScreen.tsx.
+giaiTrinh.get("/thong-bao-cong-ty", async (c) => {
+  const user = c.get("user");
+  const trangThai = c.req.query("trang_thai");
+  const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10) || 1);
+  const offset = (page - 1) * THONG_BAO_CONG_TY_PAGE_SIZE;
+
+  const dieuKienDoc = trangThai === "chua_doc" ? " AND x.da_doc_luc IS NULL" : trangThai === "da_doc" ? " AND x.da_doc_luc IS NOT NULL" : "";
+  const { results } = await c.env.DB.prepare(
+    `SELECT t.id, t.tieu_de, t.noi_dung, t.nguoi_tao, t.tao_luc, x.da_doc_luc
+     FROM thong_bao_cong_ty_xac_nhan x JOIN thong_bao_cong_ty t ON t.id = x.thong_bao_id
+     WHERE x.nguoi_nhan = ?${dieuKienDoc} ORDER BY t.tao_luc DESC, t.id DESC LIMIT ? OFFSET ?`,
+  )
+    .bind(user.email, THONG_BAO_CONG_TY_PAGE_SIZE + 1, offset)
+    .all();
+  const hasMore = results.length > THONG_BAO_CONG_TY_PAGE_SIZE;
+  const rows = hasMore ? results.slice(0, THONG_BAO_CONG_TY_PAGE_SIZE) : results;
+
+  const chuaDocRow = await c.env.DB.prepare(
+    "SELECT COUNT(*) as cnt FROM thong_bao_cong_ty_xac_nhan WHERE nguoi_nhan = ? AND da_doc_luc IS NULL",
+  )
+    .bind(user.email)
+    .first<{ cnt: number }>();
+  return c.json({ rows, chuaDoc: chuaDocRow?.cnt ?? 0, hasMore });
+});
+
+// POST /thong-bao-cong-ty/:id/danh-dau-da-doc - danh dau 1 thong bao cong ty la da doc (chi tren
+// dong cua CHINH minh - loc them nguoi_nhan trong WHERE, khong tin id tho tu client). Giu nguyen
+// da_doc_luc cu neu da doc truoc do (khong ghi de lai thoi diem doc dau tien).
+giaiTrinh.post("/thong-bao-cong-ty/:id/danh-dau-da-doc", async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  await c.env.DB.prepare(
+    "UPDATE thong_bao_cong_ty_xac_nhan SET da_doc_luc = ? WHERE thong_bao_id = ? AND nguoi_nhan = ? AND da_doc_luc IS NULL",
+  )
+    .bind(nowVN(), id, user.email)
+    .run();
+  return c.json({ ok: true });
+});
+
+// POST /thong-bao-cong-ty/danh-dau-tat-ca-da-doc - danh dau TOAN BO thong bao cong ty chua doc cua
+// CHINH minh la da doc.
+giaiTrinh.post("/thong-bao-cong-ty/danh-dau-tat-ca-da-doc", async (c) => {
+  const user = c.get("user");
+  await c.env.DB.prepare("UPDATE thong_bao_cong_ty_xac_nhan SET da_doc_luc = ? WHERE nguoi_nhan = ? AND da_doc_luc IS NULL")
+    .bind(nowVN(), user.email)
+    .run();
+  return c.json({ ok: true });
+});
+
 export default giaiTrinh;

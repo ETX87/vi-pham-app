@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell, ShieldCheck, UserCheck, ChevronRight, CheckCheck } from "lucide-react";
+import { Bell, ShieldCheck, UserCheck, ChevronRight, CheckCheck, Megaphone } from "lucide-react";
 import { api } from "../api/client";
-import type { ThongBao } from "../types";
+import { Modal } from "../components/Modal";
+import type { ThongBao, ThongBaoCongTy } from "../types";
 
 interface Response {
   rows: ThongBao[];
+  chuaDoc: number;
+  hasMore: boolean;
+}
+
+interface ResponseCongTy {
+  rows: ThongBaoCongTy[];
   chuaDoc: number;
   hasMore: boolean;
 }
@@ -16,6 +23,7 @@ const ICON_BY_LOAI: Record<string, React.ReactNode> = {
 };
 
 type TrangThai = "" | "chua_doc" | "da_doc";
+type Nhom = "vi_pham" | "cong_ty";
 
 const FILTER_OPTIONS: { value: TrangThai; label: string }[] = [
   { value: "", label: "Tất cả" },
@@ -23,7 +31,9 @@ const FILTER_OPTIONS: { value: TrangThai; label: string }[] = [
   { value: "da_doc", label: "Đã đọc" },
 ];
 
-export function NotificationsScreen({ onSelectViPham, onChanged }: { onSelectViPham: (id: string) => void; onChanged?: () => void }) {
+// Danh sach thong bao vi pham tu dong sinh (bang thong_bao) - giu nguyen hanh vi cu, chi doi ten
+// component con de tach khoi phan "Cong ty" moi them.
+function DanhSachViPham({ onSelectViPham, onChanged }: { onSelectViPham: (id: string) => void; onChanged?: () => void }) {
   const [trangThai, setTrangThai] = useState<TrangThai>("chua_doc");
   const [rows, setRows] = useState<ThongBao[]>([]);
   const [chuaDoc, setChuaDoc] = useState(0);
@@ -34,7 +44,6 @@ export function NotificationsScreen({ onSelectViPham, onChanged }: { onSelectViP
   const [markingAll, setMarkingAll] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Doi bo loc -> nap lai tu trang 1 (khong giu du lieu trang cu cua bo loc truoc).
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -69,8 +78,6 @@ export function NotificationsScreen({ onSelectViPham, onChanged }: { onSelectViP
       .finally(() => setLoadingMore(false));
   }
 
-  // Infinite scroll kieu Facebook - cham sentinel o cuoi danh sach thi tu tai trang tiep theo, thay
-  // vi nut "Xem them" hay tai het 1 lan (50 dong truoc day, ton doc D1 neu danh sach dai).
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -101,8 +108,6 @@ export function NotificationsScreen({ onSelectViPham, onChanged }: { onSelectViP
     try {
       await api.post("/giai-trinh/thong-bao/danh-dau-tat-ca-da-doc");
       if (trangThai === "chua_doc") {
-        // Dang loc "Chua doc" - toan bo dong hien tai vua thanh "da doc", khong con thuoc bo loc
-        // nay nua nen xoa het khoi danh sach dang xem.
         setRows([]);
         setHasMore(false);
       } else {
@@ -118,21 +123,18 @@ export function NotificationsScreen({ onSelectViPham, onChanged }: { onSelectViP
   if (loading) return <div className="loading-state">Đang tải...</div>;
 
   return (
-    <div className="narrow">
-      <div className="section-title" style={{ marginTop: 0, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <span>
-          Thông báo {chuaDoc > 0 && <span className="badge">{chuaDoc}</span>}
-        </span>
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
+        <div className="pill-tabs" style={{ marginBottom: 0 }}>
+          {FILTER_OPTIONS.map((o) => (
+            <button key={o.value} className={`pill-tab ${trangThai === o.value ? "active" : ""}`} onClick={() => setTrangThai(o.value)}>
+              {o.label}
+            </button>
+          ))}
+        </div>
         <button className="btn btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={handleMarkAllRead} disabled={markingAll || chuaDoc === 0}>
           <CheckCheck size={14} /> Đánh dấu tất cả đã đọc
         </button>
-      </div>
-      <div className="pill-tabs" style={{ marginBottom: 12 }}>
-        {FILTER_OPTIONS.map((o) => (
-          <button key={o.value} className={`pill-tab ${trangThai === o.value ? "active" : ""}`} onClick={() => setTrangThai(o.value)}>
-            {o.label}
-          </button>
-        ))}
       </div>
 
       {rows.length === 0 ? (
@@ -160,6 +162,175 @@ export function NotificationsScreen({ onSelectViPham, onChanged }: { onSelectViP
           {loadingMore && <div className="loading-state">Đang tải thêm...</div>}
         </>
       )}
+    </div>
+  );
+}
+
+// Danh sach thong bao cong ty (Admin soan + chon nguoi nhan, migration 0009) - khac DanhSachViPham
+// o tren: khong co link dieu huong, bam card mo Modal xem full noi dung + tu danh dau da doc.
+function DanhSachCongTy({ onChanged }: { onChanged?: () => void }) {
+  const [trangThai, setTrangThai] = useState<TrangThai>("chua_doc");
+  const [rows, setRows] = useState<ThongBaoCongTy[]>([]);
+  const [chuaDoc, setChuaDoc] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
+  const [xemChiTiet, setXemChiTiet] = useState<ThongBaoCongTy | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api
+      .get<ResponseCongTy>(`/giai-trinh/thong-bao-cong-ty?trang_thai=${trangThai}&page=1`)
+      .then((r) => {
+        if (cancelled) return;
+        setRows(r.rows);
+        setChuaDoc(r.chuaDoc);
+        setHasMore(r.hasMore);
+        setPage(1);
+      })
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trangThai]);
+
+  function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    api
+      .get<ResponseCongTy>(`/giai-trinh/thong-bao-cong-ty?trang_thai=${trangThai}&page=${nextPage}`)
+      .then((r) => {
+        setRows((prev) => [...prev, ...r.rows]);
+        setChuaDoc(r.chuaDoc);
+        setHasMore(r.hasMore);
+        setPage(nextPage);
+      })
+      .finally(() => setLoadingMore(false));
+  }
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sentinelRef.current, hasMore, loadingMore, page, trangThai]);
+
+  async function handleOpen(tb: ThongBaoCongTy) {
+    setXemChiTiet(tb);
+    if (!tb.da_doc_luc) {
+      await api.post(`/giai-trinh/thong-bao-cong-ty/${tb.id}/danh-dau-da-doc`);
+      setRows((prev) => prev.map((r) => (r.id === tb.id ? { ...r, da_doc_luc: new Date().toISOString() } : r)));
+      setChuaDoc((c) => Math.max(0, c - 1));
+      onChanged?.();
+    }
+  }
+
+  async function handleMarkAllRead() {
+    if (markingAll || chuaDoc === 0) return;
+    setMarkingAll(true);
+    try {
+      await api.post("/giai-trinh/thong-bao-cong-ty/danh-dau-tat-ca-da-doc");
+      if (trangThai === "chua_doc") {
+        setRows([]);
+        setHasMore(false);
+      } else {
+        setRows((prev) => prev.map((r) => ({ ...r, da_doc_luc: r.da_doc_luc ?? new Date().toISOString() })));
+      }
+      setChuaDoc(0);
+      onChanged?.();
+    } finally {
+      setMarkingAll(false);
+    }
+  }
+
+  if (loading) return <div className="loading-state">Đang tải...</div>;
+
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
+        <div className="pill-tabs" style={{ marginBottom: 0 }}>
+          {FILTER_OPTIONS.map((o) => (
+            <button key={o.value} className={`pill-tab ${trangThai === o.value ? "active" : ""}`} onClick={() => setTrangThai(o.value)}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <button className="btn btn-sm" style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={handleMarkAllRead} disabled={markingAll || chuaDoc === 0}>
+          <CheckCheck size={14} /> Đánh dấu tất cả đã đọc
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="empty-state">{trangThai === "chua_doc" ? "Không có thông báo chưa đọc." : trangThai === "da_doc" ? "Không có thông báo đã đọc." : "Chưa có thông báo nào."}</div>
+      ) : (
+        <>
+          {rows.map((tb) => (
+            <div key={tb.id} className={`card card-clickable ${!tb.da_doc_luc ? "card-priority" : ""}`} onClick={() => handleOpen(tb)} style={{ display: "flex", gap: 12 }}>
+              <span className="icon-row-icon" style={{ marginTop: 2 }}>
+                <Megaphone size={16} />
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="card-title" style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: tb.da_doc_luc ? 500 : 700 }}>
+                  {!tb.da_doc_luc && <span className="dot-unread" />}
+                  {tb.tieu_de}
+                </div>
+                <div className="card-meta">
+                  <span>{tb.tao_luc}</span>
+                </div>
+              </div>
+              <ChevronRight size={18} color="var(--ink-400)" style={{ flexShrink: 0 }} />
+            </div>
+          ))}
+          <div ref={sentinelRef} />
+          {loadingMore && <div className="loading-state">Đang tải thêm...</div>}
+        </>
+      )}
+
+      {xemChiTiet && (
+        <Modal onClose={() => setXemChiTiet(null)}>
+          <div className="card-title" style={{ marginBottom: 8 }}>
+            {xemChiTiet.tieu_de}
+          </div>
+          <div className="card-meta" style={{ marginBottom: 12 }}>
+            <span>{xemChiTiet.tao_luc}</span>
+          </div>
+          <div style={{ whiteSpace: "pre-wrap", fontSize: 14 }}>{xemChiTiet.noi_dung}</div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+export function NotificationsScreen({ onSelectViPham, onChanged }: { onSelectViPham: (id: string) => void; onChanged?: () => void }) {
+  const [nhom, setNhom] = useState<Nhom>("vi_pham");
+
+  return (
+    <div className="narrow">
+      <div className="section-title" style={{ marginTop: 0 }}>
+        <div className="pill-tabs" style={{ marginBottom: 0 }}>
+          <button className={`pill-tab ${nhom === "vi_pham" ? "active" : ""}`} onClick={() => setNhom("vi_pham")}>
+            Vi phạm
+          </button>
+          <button className={`pill-tab ${nhom === "cong_ty" ? "active" : ""}`} onClick={() => setNhom("cong_ty")}>
+            Công ty
+          </button>
+        </div>
+      </div>
+
+      {nhom === "vi_pham" ? <DanhSachViPham onSelectViPham={onSelectViPham} onChanged={onChanged} /> : <DanhSachCongTy onChanged={onChanged} />}
     </div>
   );
 }

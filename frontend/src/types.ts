@@ -116,6 +116,16 @@ export interface ThongBao {
   ngay_tao: string;
 }
 
+export interface ThongBaoCongTy {
+  id: number;
+  tieu_de: string;
+  noi_dung: string;
+  nguoi_tao: string;
+  tao_luc: string;
+  // null = chua doc - chi co o goc nhin nguoi nhan (GET /giai-trinh/thong-bao-cong-ty).
+  da_doc_luc: string | null;
+}
+
 export interface LoaiLoiDinhNghia {
   ma: string;
   ten_hien_thi: string;
