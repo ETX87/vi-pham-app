@@ -73,11 +73,14 @@ function dieuKienTrangThai(trangThai: string | undefined): string {
   }
 }
 
+// ?1 = ma_ktv can loc (NULL = toan doi, chi Admin), ?2 = ma_ktv cua nguoi dang xem (de danh dau la_cua_toi).
 const VP_EXT_CTE = `WITH vp_ext AS (
   SELECT vp.*,
          EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id) as da_giai_trinh,
-         EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id AND gt.dong_bo_dvbh_luc IS NULL) as dang_cho_dong_bo
-  FROM vi_pham vp WHERE vp.ky_thuat_vien_ma_ktv = ?
+         EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id AND gt.dong_bo_dvbh_luc IS NULL) as dang_cho_dong_bo,
+         (SELECT k.ten_hien_thi FROM ktv_lien_he k WHERE k.ma_ktv = vp.ky_thuat_vien_ma_ktv) as ten_ktv_khop,
+         CASE WHEN vp.ky_thuat_vien_ma_ktv = ?2 THEN 1 ELSE 0 END as la_cua_toi
+  FROM vi_pham vp WHERE (?1 IS NULL OR vp.ky_thuat_vien_ma_ktv = ?1)
 )`;
 
 // GET /vi-pham?trang_thai=...&page=1 - danh sach vi pham cua CHINH KTV dang dang nhap, moi nhat
@@ -85,19 +88,25 @@ const VP_EXT_CTE = `WITH vp_ext AS (
 // /thong-bao) de tranh doc het toan bo vi pham moi lan mo man hinh. "thongKe" (dem theo tung trang
 // thai + tong) va "chuaXuLy" (badge) luon tinh TREN TOAN BO vi pham cua KTV nay (khong theo
 // trang_thai/page dang xem) bang 1 cau aggregate RIENG, KHONG phai tu "rows" cua trang hien tai.
+// Admin (2026-10-26): ?ma_ktv= xem 1 KTV, ?toan_doi=1 xem ca doi; khong truyen gi = cua chinh minh nhu KTV thuong (App.tsx
+// goi kieu nay de lay badge - neu mac dinh toan doi thi badge Admin se cong ca doi). KTV thuong bo qua 2 tham so nay.
 giaiTrinh.get("/vi-pham", async (c) => {
   const user = c.get("user");
   const maKtv = await getMaKtvForEmail(c.env.DB, user.email);
-  if (!maKtv) return c.json({ rows: [], hasMore: false, chuaXuLy: 0, thongKe: { tong: 0, chuaGiaiTrinh: 0, quaHan: 0, choChot: 0, daChot: 0 } });
+  const laAdmin = user.vai_tro === "Admin";
+  const maKtvChon = laAdmin ? c.req.query("ma_ktv")?.trim() || null : null;
+  const toanDoi = laAdmin && !maKtvChon && c.req.query("toan_doi") === "1";
+  const loc = maKtvChon ?? (toanDoi ? null : maKtv);
+  if (!loc && !toanDoi) return c.json({ rows: [], hasMore: false, chuaXuLy: 0, thongKe: { tong: 0, chuaGiaiTrinh: 0, quaHan: 0, choChot: 0, daChot: 0 } });
 
   const trangThai = c.req.query("trang_thai");
   const page = Math.max(1, parseInt(c.req.query("page") ?? "1", 10) || 1);
   const offset = (page - 1) * VI_PHAM_PAGE_SIZE;
 
   const { results } = await c.env.DB.prepare(
-    `${VP_EXT_CTE} SELECT * FROM vp_ext WHERE ${dieuKienTrangThai(trangThai)} ORDER BY ngay_ghi_nhan DESC LIMIT ? OFFSET ?`,
+    `${VP_EXT_CTE} SELECT * FROM vp_ext WHERE ${dieuKienTrangThai(trangThai)} ORDER BY ngay_ghi_nhan DESC LIMIT ?3 OFFSET ?4`,
   )
-    .bind(maKtv, VI_PHAM_PAGE_SIZE + 1, offset)
+    .bind(loc, maKtv, VI_PHAM_PAGE_SIZE + 1, offset)
     .all<ViPhamRow>();
   const hasMore = results.length > VI_PHAM_PAGE_SIZE;
   const rows = hasMore ? results.slice(0, VI_PHAM_PAGE_SIZE) : results;
@@ -114,7 +123,7 @@ giaiTrinh.get("/vi-pham", async (c) => {
         SUM(CASE WHEN da_giai_trinh = 0 AND (chot_bo_cap_2 IS NULL OR chot_bo_cap_2 != 0) THEN 1 ELSE 0 END) as chua_xu_ly
      FROM vp_ext`,
   )
-    .bind(maKtv)
+    .bind(loc, maKtv)
     .first<{ tong: number; chua_giai_trinh: number; qua_han: number; cho_chot: number; da_chot: number; chua_xu_ly: number }>();
 
   return c.json({

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, ClipboardList, AlertCircle, AlertTriangle, Clock3, CheckCircle2, LifeBuoy } from "lucide-react";
 import { api } from "../api/client";
-import type { ViPham } from "../types";
+import type { KtvOption, ViPham } from "../types";
+import { KtvCombobox } from "../components/KtvCombobox";
 import { loaiLoiLabel } from "../lib/format";
 import { StatusBadge, viPhamStatus } from "../components/StatusBadge";
 import { LoaiLoiHelp } from "../components/LoaiLoiHelp";
@@ -29,9 +30,9 @@ const TRANG_THAI_OPTIONS: { value: string; label: string }[] = [
   { value: "status-decided", label: "Đã chốt lỗi" },
 ];
 
-function ThongTinNhanh({ thongKe }: { thongKe: ThongKe }) {
+function ThongTinNhanh({ thongKe, nhanTong }: { thongKe: ThongKe; nhanTong: string }) {
   const items = [
-    { icon: <ClipboardList size={16} />, bg: "var(--ink-400)", label: "Tổng vi phạm của tôi", value: thongKe.tong },
+    { icon: <ClipboardList size={16} />, bg: "var(--ink-400)", label: nhanTong, value: thongKe.tong },
     { icon: <AlertCircle size={16} />, bg: "var(--amber-500)", label: "Chưa giải trình", value: thongKe.chuaGiaiTrinh },
     { icon: <AlertTriangle size={16} />, bg: "var(--red-600)", label: "Quá hạn giải trình", value: thongKe.quaHan },
     { icon: <Clock3 size={16} />, bg: "var(--blue-600)", label: "Chờ chốt lỗi", value: thongKe.choChot },
@@ -67,7 +68,21 @@ function ThongTinNhanh({ thongKe }: { thongKe: ThongKe }) {
   );
 }
 
-export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void }) {
+// Admin: o chon KTV giong "Bao cao nhanh", mac dinh toan doi. onSelect(id, readOnly): Admin mo vi pham KHONG phai cua
+// minh thi chi xem (backend cung chan nop giai trinh thay KTV).
+// maKtv giu o App.tsx de khong mat lua chon khi mo chi tiet roi quay lai.
+export function ViPhamListScreen({
+  onSelect,
+  isAdmin,
+  maKtv,
+  setMaKtv,
+}: {
+  onSelect: (id: string, readOnly: boolean) => void;
+  isAdmin: boolean;
+  maKtv: string;
+  setMaKtv: (v: string) => void;
+}) {
+  const [ktvOptions, setKtvOptions] = useState<KtvOption[]>([]);
   const [trangThai, setTrangThai] = useState("");
   const [rows, setRows] = useState<ViPham[]>([]);
   const [chuaXuLy, setChuaXuLy] = useState(0);
@@ -79,13 +94,27 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
   const [error, setError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Doi bo loc trang thai -> nap lai tu trang 1 (khong giu du lieu trang cu cua bo loc truoc).
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.get<{ rows: KtvOption[] }>("/admin/vi-pham/ktv-options").then((r) => setKtvOptions(r.rows)).catch(() => {});
+  }, [isAdmin]);
+
+  function qs(p: number): string {
+    const params = new URLSearchParams({ trang_thai: trangThai, page: String(p) });
+    if (isAdmin) {
+      if (maKtv) params.set("ma_ktv", maKtv);
+      else params.set("toan_doi", "1");
+    }
+    return params.toString();
+  }
+
+  // Doi bo loc trang thai/KTV -> nap lai tu trang 1 (khong giu du lieu trang cu cua bo loc truoc).
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
     api
-      .get<ListResponse>(`/giai-trinh/vi-pham?trang_thai=${trangThai}&page=1`)
+      .get<ListResponse>(`/giai-trinh/vi-pham?${qs(1)}`)
       .then((res) => {
         if (cancelled) return;
         setRows(res.rows);
@@ -99,14 +128,15 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
     return () => {
       cancelled = true;
     };
-  }, [trangThai]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trangThai, maKtv, isAdmin]);
 
   function loadMore() {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     const nextPage = page + 1;
     api
-      .get<ListResponse>(`/giai-trinh/vi-pham?trang_thai=${trangThai}&page=${nextPage}`)
+      .get<ListResponse>(`/giai-trinh/vi-pham?${qs(nextPage)}`)
       .then((res) => {
         setRows((prev) => [...prev, ...res.rows]);
         setChuaXuLy(res.chuaXuLy);
@@ -131,19 +161,39 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
     observer.observe(el);
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sentinelRef.current, hasMore, loadingMore, page, trangThai]);
+  }, [sentinelRef.current, hasMore, loadingMore, page, trangThai, maKtv]);
 
-  if (loading) return <div className="loading-state">Đang tải...</div>;
-  if (error) return <div className="alert alert-error">{error}</div>;
+  // O chon KTV dat NGOAI vung loading/empty de Admin luon doi duoc KTV, ke ca khi KTV dang chon khong co vi pham nao.
+  const boChonKtv = isAdmin && (
+    <div style={{ marginBottom: 12 }}>
+      <KtvCombobox value={maKtv} onChange={setMaKtv} options={ktvOptions} allLabel="Toàn đội" containerStyle={{ maxWidth: 360 }} />
+    </div>
+  );
 
+  if (loading)
+    return (
+      <div>
+        {boChonKtv}
+        <div className="loading-state">Đang tải...</div>
+      </div>
+    );
+  if (error)
+    return (
+      <div>
+        {boChonKtv}
+        <div className="alert alert-error">{error}</div>
+      </div>
+    );
+
+  const xemNguoiKhac = isAdmin;
   const list =
     thongKe.tong === 0 ? (
-      <div className="empty-state">Bạn chưa có vi phạm nào cần giải trình. 🎉</div>
+      <div className="empty-state">{xemNguoiKhac ? "Không có vi phạm nào." : "Bạn chưa có vi phạm nào cần giải trình. 🎉"}</div>
     ) : (
       <div>
         <div className="section-title" style={{ marginTop: 0, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <span>
-            Vi phạm cần xử lý {chuaXuLy > 0 && <span className="badge">{chuaXuLy}</span>}
+            {xemNguoiKhac ? (maKtv ? "Vi phạm của KTV" : "Vi phạm toàn đội") : "Vi phạm cần xử lý"} {chuaXuLy > 0 && <span className="badge">{chuaXuLy}</span>}
           </span>
           <select value={trangThai} onChange={(e) => setTrangThai(e.target.value)} style={{ fontWeight: 400 }}>
             {TRANG_THAI_OPTIONS.map((o) => (
@@ -160,7 +210,7 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
             {rows.map((vp) => {
               const status = viPhamStatus(vp);
               return (
-                <div key={vp.id} className={`card card-clickable ${status.cls === "status-overdue" ? "card-priority" : ""}`} onClick={() => onSelect(vp.id)}>
+                <div key={vp.id} className={`card card-clickable ${status.cls === "status-overdue" ? "card-priority" : ""}`} onClick={() => onSelect(vp.id, isAdmin && !vp.la_cua_toi)}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 700, marginBottom: 2 }}>#{vp.id}</div>
@@ -170,6 +220,7 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
                       </div>
                       <div className="card-meta" style={{ marginTop: 4 }}>
                         <span>{vp.ngay_ghi_nhan}</span>
+                        {xemNguoiKhac && !maKtv && <span>KTV: {vp.ten_ktv_khop || vp.ky_thuat_vien_ten || "(chưa xác định)"}</span>}
                         {vp.khu_vuc && <span>{vp.khu_vuc}</span>}
                         {vp.khach_hang && <span>KH: {vp.khach_hang}</span>}
                       </div>
@@ -196,13 +247,16 @@ export function ViPhamListScreen({ onSelect }: { onSelect: (id: string) => void 
     );
 
   return (
-    <div className="desktop-layout">
-      <div className="desktop-main">{list}</div>
-      {thongKe.tong > 0 && (
-        <div className="desktop-sidebar">
-          <ThongTinNhanh thongKe={thongKe} />
-        </div>
-      )}
+    <div>
+      {boChonKtv}
+      <div className="desktop-layout">
+        <div className="desktop-main">{list}</div>
+        {thongKe.tong > 0 && (
+          <div className="desktop-sidebar">
+            <ThongTinNhanh thongKe={thongKe} nhanTong={xemNguoiKhac ? "Tổng vi phạm" : "Tổng vi phạm của tôi"} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

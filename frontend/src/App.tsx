@@ -21,6 +21,9 @@ function MainApp() {
   const state = useAuth();
   const [tab, setTab] = useState<Tab>("vi-pham");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Admin mo vi pham cua KTV khac tu "Vi pham" (chon KTV/toan doi) -> chi xem, giong AdminScreen.
+  const [selectedReadOnly, setSelectedReadOnly] = useState(false);
+  const [viPhamKtv, setViPhamKtv] = useState("");
   const push = usePushNotifications();
   const [viPhamBadge, setViPhamBadge] = useState(0);
   const [thongBaoBadge, setThongBaoBadge] = useState(0);
@@ -86,6 +89,7 @@ function MainApp() {
 
   function goToViPham(id: string) {
     setTab("vi-pham");
+    setSelectedReadOnly(false);
     setSelectedId(id);
   }
 
@@ -154,9 +158,17 @@ function MainApp() {
         ) : tab === "tai-khoan" ? (
           <AccountScreen user={user} push={push} />
         ) : selectedId ? (
-          <ViPhamDetailScreen id={selectedId} onBack={() => setSelectedId(null)} onChanged={refreshBadges} />
+          <ViPhamDetailScreen id={selectedId} onBack={() => setSelectedId(null)} onChanged={refreshBadges} readOnly={selectedReadOnly} />
         ) : (
-          <ViPhamListScreen onSelect={setSelectedId} />
+          <ViPhamListScreen
+            onSelect={(id, readOnly) => {
+              setSelectedReadOnly(readOnly);
+              setSelectedId(id);
+            }}
+            isAdmin={isAdmin}
+            maKtv={viPhamKtv}
+            setMaKtv={setViPhamKtv}
+          />
         )}
       </div>
       <BottomTabBar

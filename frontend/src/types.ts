@@ -29,6 +29,9 @@ export interface ViPham {
   ghi_chu: string | null;
   da_giai_trinh?: number;
   dang_cho_dong_bo?: number;
+  // Chi co o GET /giai-trinh/vi-pham: ten KTV da khop (Admin xem toan doi) + 1 neu la vi pham cua chinh nguoi dang xem.
+  ten_ktv_khop?: string | null;
+  la_cua_toi?: number;
   // Ket qua chot cap 2 cua QC (PARTNER_API_GUIDE.md muc 9.1.2a) - NULL = QC chua chot.
   chot_bo_cap_2: number | null;
   nguoi_chot: string | null;
