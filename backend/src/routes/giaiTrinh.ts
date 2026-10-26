@@ -6,7 +6,7 @@ import { uploadPublicImage } from "../lib/googleDrive";
 import { syncGiaiTrinhToDvbh, type GiaiTrinhSyncRow } from "../lib/dvbhClient";
 import { nowVN, todayVN } from "../lib/vnTime";
 import { getCachedCaseLookup, syncCaseLookup } from "../lib/caseLookupCache";
-import { getThongKeDvbh } from "../lib/thongKeDvbh";
+import { getThongKeDvbh, type ThongKeDvbhRow } from "../lib/thongKeDvbh";
 
 // Route session-authenticated cho KTV: xem danh sach vi pham cua CHINH MINH, xem chi tiet, upload
 // anh bang chung, nop giai trinh - xem ke hoach xay dung phan "giaiTrinh.ts".
@@ -136,13 +136,50 @@ function tyLe(tu: number, mau: number): number {
   return mau > 0 ? Math.round((tu / mau) * 1000) / 10 : 0;
 }
 
-// Moi vi pham cua 1 KTV trong 1 thang + thoi diem nop giai trinh DAU TIEN (gt_dau, gio VN - cung quy
-// uoc voi ngay_ghi_nhan nen so sanh chuoi truc tiep duoc). Dung chung cho moi cau aggregate cua
-// /bao-cao ben duoi.
+// Moi vi pham trong 1 thang + thoi diem nop giai trinh DAU TIEN (gt_dau, gio VN - cung quy uoc voi
+// ngay_ghi_nhan nen so sanh chuoi truc tiep duoc). ?1 = ma_ktv (NULL = toan doi, chi Admin), ?2 = thang.
+// Dung chung cho moi cau aggregate cua /bao-cao ben duoi.
 const BAO_CAO_CTE = `WITH vp AS (
   SELECT v.*, (SELECT MIN(gt.tao_luc) FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = v.id) as gt_dau
-  FROM vi_pham v WHERE v.ky_thuat_vien_ma_ktv = ? AND substr(v.ngay_ghi_nhan, 1, 7) = ?
+  FROM vi_pham v WHERE (?1 IS NULL OR v.ky_thuat_vien_ma_ktv = ?1) AND substr(v.ngay_ghi_nhan, 1, 7) = ?2
 )`;
+
+/** Cong gop so lieu DVBH nhieu KTV (Admin xem toan doi). Thoi gian xu ly TB = trung binh co trong so theo
+ * ca_hoan_thanh - xap xi, vi DVBH khong tra so ca co so_gio_xu_ly hop le cua tung KTV. */
+function congGopCongViec(rows: ThongKeDvbhRow[]): ThongKeDvbhRow {
+  const g: ThongKeDvbhRow = {
+    ma_ktv: "",
+    ten_ktv: null,
+    tong_ca_tiep_nhan: 0,
+    ca_tiep_nhan_con_ton: 0,
+    ca_dong: 0,
+    ca_hoan_thanh: 0,
+    ca_khong_hoan_thanh: 0,
+    ca_dung_han: 0,
+    ca_tinh_sla: 0,
+    ca_duoi_24h: 0,
+    ca_tinh_24h: 0,
+    phan_bo_24h: {},
+    thoi_gian_xu_ly_tb_gio: null,
+    nghi_ngo: { loi_120p: 0, hen_qua_24h: 0, lo_ke_hoach: 0, kh_hen_lai: 0, tong: 0 },
+    vi_pham_da_khao_sat: 0,
+    vi_pham_xac_nhan: 0,
+  };
+  const SO = ["tong_ca_tiep_nhan", "ca_tiep_nhan_con_ton", "ca_dong", "ca_hoan_thanh", "ca_khong_hoan_thanh", "ca_dung_han", "ca_tinh_sla", "ca_duoi_24h", "ca_tinh_24h", "vi_pham_da_khao_sat", "vi_pham_xac_nhan"] as const;
+  let tongGio = 0;
+  let trongSo = 0;
+  for (const r of rows) {
+    for (const k of SO) g[k] += r[k];
+    for (const [nhom, sl] of Object.entries(r.phan_bo_24h)) g.phan_bo_24h[nhom] = (g.phan_bo_24h[nhom] ?? 0) + sl;
+    for (const k of ["loi_120p", "hen_qua_24h", "lo_ke_hoach", "kh_hen_lai", "tong"] as const) g.nghi_ngo[k] += r.nghi_ngo[k];
+    if (r.thoi_gian_xu_ly_tb_gio !== null && r.ca_hoan_thanh > 0) {
+      tongGio += r.thoi_gian_xu_ly_tb_gio * r.ca_hoan_thanh;
+      trongSo += r.ca_hoan_thanh;
+    }
+  }
+  g.thoi_gian_xu_ly_tb_gio = trongSo > 0 ? Math.round((tongGio / trongSo) * 10) / 10 : null;
+  return g;
+}
 
 // GET /bao-cao?thang=YYYY-MM - bao cao nhanh cua CHINH KTV dang dang nhap cho 1 thang (mac dinh
 // thang hien tai) - loc theo ngay_ghi_nhan (thang vi pham PHAT SINH, khong phai thang chot).
@@ -154,12 +191,15 @@ const BAO_CAO_CTE = `WITH vp AS (
 // - "theoLoaiLoi": CHI vi pham DA CHOT LA LOI THAT, ty le tren tong da chot (yeu cau cu, giu nguyen).
 // - "theoLoaiNghiNgo"/"theoKetQuaCap1": tren TOAN BO nghi ngo trong thang, kem ty le chot thanh loi.
 // - "congViec": so lieu ca cua KTV tu DVBH (tong ca, dung han, 24h, toc do xu ly...) - lib/thongKeDvbh.ts, cache 1h.
+// Pham vi: KTV thuong = CHI cua minh (bo qua ?ma_ktv). Admin = toan doi, hoac 1 KTV qua ?ma_ktv - Admin khong gan
+// KTV nao nen truoc day man nay cua Admin toan so 0 va khong goi DVBH lan nao.
 giaiTrinh.get("/bao-cao", async (c) => {
   const user = c.get("user");
-  const maKtv = await getMaKtvForEmail(c.env.DB, user.email);
+  const laAdmin = user.vai_tro === "Admin";
+  const maKtv = laAdmin ? c.req.query("ma_ktv")?.trim() || null : await getMaKtvForEmail(c.env.DB, user.email);
   const thang = /^\d{4}-\d{2}$/.test(c.req.query("thang") ?? "") ? c.req.query("thang")! : todayVN().slice(0, 7);
 
-  if (!maKtv) {
+  if (!laAdmin && !maKtv) {
     return c.json({
       thang,
       thongKe: { tong: 0, soCase: 0, dangCho: 0, quaHan: 0, daChot: 0, daBo: 0, tyLeChotLoi: 0 },
@@ -200,7 +240,7 @@ giaiTrinh.get("/bao-cao", async (c) => {
   const { results: loaiLoiRows } = await c.env.DB.prepare(
     `SELECT vp.loai_loi, COALESCE(ll.ten_hien_thi, vp.loai_loi) as ten_hien_thi, COUNT(*) as so_luong
      FROM vi_pham vp LEFT JOIN loai_loi_mo_ta ll ON ll.ma = vp.loai_loi
-     WHERE vp.ky_thuat_vien_ma_ktv = ? AND substr(vp.ngay_ghi_nhan, 1, 7) = ? AND vp.chot_bo_cap_2 = 1
+     WHERE (?1 IS NULL OR vp.ky_thuat_vien_ma_ktv = ?1) AND substr(vp.ngay_ghi_nhan, 1, 7) = ?2 AND vp.chot_bo_cap_2 = 1
      GROUP BY vp.loai_loi, ten_hien_thi ORDER BY so_luong DESC`,
   )
     .bind(maKtv, thang)
@@ -265,7 +305,7 @@ giaiTrinh.get("/bao-cao", async (c) => {
     // null = chua tung lay duoc so lieu DVBH cho thang nay. row null = DVBH co du lieu nhung KTV nay khong co ca nao.
     congViec: congViec.payload
       ? {
-          row: congViec.payload.rows.find((r) => r.ma_ktv === maKtv) ?? null,
+          row: maKtv ? (congViec.payload.rows.find((r) => r.ma_ktv === maKtv) ?? null) : congGopCongViec(congViec.payload.rows),
           tinhLuc: congViec.payload.tinh_luc,
           layLuc: congViec.layLuc,
           loi: congViec.loi,

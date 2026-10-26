@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Clock3, AlertTriangle, CheckCircle2, XCircle, FileCheck2, FileClock, Timer } from "lucide-react";
 import { api } from "../api/client";
+import { KtvCombobox } from "../components/KtvCombobox";
+import type { KtvOption } from "../types";
 
 interface ThongKeThang {
   tong: number;
@@ -227,7 +229,7 @@ function TheCongViec({ cv }: { cv: CongViec | null }) {
         </div>
       )}
       {!r ? (
-        <div className="empty-state">Không có ca nào của bạn trong tháng này.</div>
+        <div className="empty-state">Không có ca nào trong tháng này.</div>
       ) : (
         <>
           <div className="kv-grid">
@@ -321,31 +323,45 @@ function TheCongViec({ cv }: { cv: CongViec | null }) {
   );
 }
 
-export function BaoCaoScreen() {
+// Admin: mac dinh xem TOAN DOI, chon 1 KTV de xem rieng (backend chi nhan ?ma_ktv tu Admin). KTV thuong: chi cua minh.
+export function BaoCaoScreen({ isAdmin }: { isAdmin: boolean }) {
   const [thang, setThang] = useState(thangHienTai());
+  const [maKtv, setMaKtv] = useState("");
+  const [ktvOptions, setKtvOptions] = useState<KtvOption[]>([]);
   const [data, setData] = useState<BaoCaoResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isAdmin) return;
+    api.get<{ rows: KtvOption[] }>("/admin/vi-pham/ktv-options").then((r) => setKtvOptions(r.rows)).catch(() => {});
+  }, [isAdmin]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    const qs = new URLSearchParams({ thang, ...(isAdmin && maKtv ? { ma_ktv: maKtv } : {}) });
     api
-      .get<BaoCaoResponse>(`/giai-trinh/bao-cao?thang=${thang}`)
+      .get<BaoCaoResponse>(`/giai-trinh/bao-cao?${qs.toString()}`)
       .then((res) => !cancelled && setData(res))
       .catch(() => !cancelled && setError("Không tải được báo cáo."))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [thang]);
+  }, [thang, maKtv, isAdmin]);
 
   return (
     <div>
       <div className="section-title" style={{ marginTop: 0, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <span>Báo cáo nhanh</span>
-        <input type="month" value={thang} max={thangHienTai()} onChange={(e) => e.target.value && setThang(e.target.value)} />
+        <span>Báo cáo nhanh{isAdmin && !maKtv ? " · toàn đội" : ""}</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {isAdmin && (
+            <KtvCombobox value={maKtv} onChange={setMaKtv} options={ktvOptions} allLabel="Toàn đội" containerStyle={{ minWidth: 220 }} />
+          )}
+          <input type="month" value={thang} max={thangHienTai()} onChange={(e) => e.target.value && setThang(e.target.value)} />
+        </div>
       </div>
 
       {loading ? (

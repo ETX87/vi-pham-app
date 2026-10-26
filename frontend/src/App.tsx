@@ -148,7 +148,7 @@ function MainApp() {
         {tab === "admin" && isAdmin ? (
           <AdminScreen />
         ) : tab === "bao-cao" ? (
-          <BaoCaoScreen />
+          <BaoCaoScreen isAdmin={isAdmin} />
         ) : tab === "thong-bao" ? (
           <NotificationsScreen onSelectViPham={goToViPham} onChanged={refreshBadges} />
         ) : tab === "tai-khoan" ? (
