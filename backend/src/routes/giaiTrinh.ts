@@ -6,6 +6,7 @@ import { uploadPublicImage } from "../lib/googleDrive";
 import { syncGiaiTrinhToDvbh, type GiaiTrinhSyncRow } from "../lib/dvbhClient";
 import { nowVN, todayVN } from "../lib/vnTime";
 import { getCachedCaseLookup, syncCaseLookup } from "../lib/caseLookupCache";
+import { getThongKeDvbh } from "../lib/thongKeDvbh";
 
 // Route session-authenticated cho KTV: xem danh sach vi pham cua CHINH MINH, xem chi tiet, upload
 // anh bang chung, nop giai trinh - xem ke hoach xay dung phan "giaiTrinh.ts".
@@ -130,38 +131,71 @@ giaiTrinh.get("/vi-pham", async (c) => {
   });
 });
 
+/** % lam tron 1 chu so thap phan, 0 khi mau so = 0 (tranh NaN/Infinity tra ve frontend). */
+function tyLe(tu: number, mau: number): number {
+  return mau > 0 ? Math.round((tu / mau) * 1000) / 10 : 0;
+}
+
+// Moi vi pham cua 1 KTV trong 1 thang + thoi diem nop giai trinh DAU TIEN (gt_dau, gio VN - cung quy
+// uoc voi ngay_ghi_nhan nen so sanh chuoi truc tiep duoc). Dung chung cho moi cau aggregate cua
+// /bao-cao ben duoi.
+const BAO_CAO_CTE = `WITH vp AS (
+  SELECT v.*, (SELECT MIN(gt.tao_luc) FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = v.id) as gt_dau
+  FROM vi_pham v WHERE v.ky_thuat_vien_ma_ktv = ? AND substr(v.ngay_ghi_nhan, 1, 7) = ?
+)`;
+
 // GET /bao-cao?thang=YYYY-MM - bao cao nhanh cua CHINH KTV dang dang nhap cho 1 thang (mac dinh
-// thang hien tai neu bo qua "thang") - loc theo ngay_ghi_nhan (thang vi pham PHAT SINH, khong phai
-// thang chot). "thongKe" la 4 nhom loai tru lan nhau/cong du tong (dang_cho = chua chot VA chua qua
-// han, gop chung 2 trang thai "chua giai trinh" + "cho chot loi" vi ca 2 deu la "dang xu ly, chua co
-// ket luan" tu goc nhin bao cao thang - qua_han tach rieng vi la tin hieu can chu y). "theoLoaiLoi"
-// CHI tinh tren nhung vi pham DA CHOT LA LOI THAT (chot_bo_cap_2 = 1) trong thang do, ty_le = %
-// tren tong so da_chot (khop dung yeu cau "sl va ty le loi theo loi DA CHOT").
+// thang hien tai) - loc theo ngay_ghi_nhan (thang vi pham PHAT SINH, khong phai thang chot).
+// - "thongKe": 4 nhom loai tru nhau, cong du tong. quaHan = chua chot + CHUA giai trinh + qua 48h
+//   (khop dieuKienTrangThai("status-overdue") cua danh sach - truoc day dem ca vi pham da giai trinh
+//   nhung QC chua chot, lam KTV nop dung han van bi tinh "qua han giai trinh").
+// - "giaiTrinh": chuaGiaiTrinh khong tinh vi pham QC da BO (khong con can giai trinh). dungHan = nop
+//   lan dau trong 48h ke tu ngay_ghi_nhan (cung moc 48h voi quaHan).
+// - "theoLoaiLoi": CHI vi pham DA CHOT LA LOI THAT, ty le tren tong da chot (yeu cau cu, giu nguyen).
+// - "theoLoaiNghiNgo"/"theoKetQuaCap1": tren TOAN BO nghi ngo trong thang, kem ty le chot thanh loi.
+// - "congViec": so lieu ca cua KTV tu DVBH (tong ca, dung han, 24h, toc do xu ly...) - lib/thongKeDvbh.ts, cache 1h.
 giaiTrinh.get("/bao-cao", async (c) => {
   const user = c.get("user");
   const maKtv = await getMaKtvForEmail(c.env.DB, user.email);
   const thang = /^\d{4}-\d{2}$/.test(c.req.query("thang") ?? "") ? c.req.query("thang")! : todayVN().slice(0, 7);
 
   if (!maKtv) {
-    return c.json({ thang, thongKe: { tong: 0, dangCho: 0, quaHan: 0, daChot: 0, daBo: 0 }, theoLoaiLoi: [] });
+    return c.json({
+      thang,
+      thongKe: { tong: 0, soCase: 0, dangCho: 0, quaHan: 0, daChot: 0, daBo: 0, tyLeChotLoi: 0 },
+      giaiTrinh: { daGiaiTrinh: 0, chuaGiaiTrinh: 0, dungHan: 0, tyLeGiaiTrinh: 0, tyLeDungHan: 0 },
+      theoLoaiLoi: [],
+      theoLoaiNghiNgo: [],
+      theoKetQuaCap1: [],
+      congViec: null,
+    });
   }
 
-  const thongKeRow = await c.env.DB.prepare(
-    `SELECT
+  // Goi song song voi cac cau D1 ben duoi - lan dau trong gio phai cho DVBH tra loi.
+  const congViecPromise = getThongKeDvbh(c.env, thang);
+
+  const tk = await c.env.DB.prepare(
+    `${BAO_CAO_CTE} SELECT
         COUNT(*) as tong,
-        SUM(CASE WHEN chot_bo_cap_2 IS NULL AND ngay_ghi_nhan < datetime(${SQL_NOW_VN}, '-48 hours') THEN 1 ELSE 0 END) as qua_han,
+        COUNT(DISTINCT case_id) as so_case,
+        SUM(CASE WHEN chot_bo_cap_2 IS NULL AND gt_dau IS NULL AND ngay_ghi_nhan < datetime(${SQL_NOW_VN}, '-48 hours') THEN 1 ELSE 0 END) as qua_han,
         SUM(CASE WHEN chot_bo_cap_2 = 1 THEN 1 ELSE 0 END) as da_chot,
-        SUM(CASE WHEN chot_bo_cap_2 = 0 THEN 1 ELSE 0 END) as da_bo
-     FROM vi_pham WHERE ky_thuat_vien_ma_ktv = ? AND substr(ngay_ghi_nhan, 1, 7) = ?`,
+        SUM(CASE WHEN chot_bo_cap_2 = 0 THEN 1 ELSE 0 END) as da_bo,
+        SUM(CASE WHEN gt_dau IS NOT NULL THEN 1 ELSE 0 END) as da_giai_trinh,
+        SUM(CASE WHEN gt_dau IS NULL AND (chot_bo_cap_2 IS NULL OR chot_bo_cap_2 != 0) THEN 1 ELSE 0 END) as chua_giai_trinh,
+        SUM(CASE WHEN gt_dau IS NOT NULL AND gt_dau <= datetime(ngay_ghi_nhan, '+48 hours') THEN 1 ELSE 0 END) as dung_han
+     FROM vp`,
   )
     .bind(maKtv, thang)
-    .first<{ tong: number; qua_han: number; da_chot: number; da_bo: number }>();
+    .first<{ tong: number; so_case: number; qua_han: number; da_chot: number; da_bo: number; da_giai_trinh: number; chua_giai_trinh: number; dung_han: number }>();
 
-  const tong = thongKeRow?.tong ?? 0;
-  const quaHan = thongKeRow?.qua_han ?? 0;
-  const daChot = thongKeRow?.da_chot ?? 0;
-  const daBo = thongKeRow?.da_bo ?? 0;
-  const dangCho = Math.max(0, tong - quaHan - daChot - daBo);
+  const tong = tk?.tong ?? 0;
+  const quaHan = tk?.qua_han ?? 0;
+  const daChot = tk?.da_chot ?? 0;
+  const daBo = tk?.da_bo ?? 0;
+  const daGiaiTrinh = tk?.da_giai_trinh ?? 0;
+  const chuaGiaiTrinh = tk?.chua_giai_trinh ?? 0;
+  const dungHan = tk?.dung_han ?? 0;
 
   const { results: loaiLoiRows } = await c.env.DB.prepare(
     `SELECT vp.loai_loi, COALESCE(ll.ten_hien_thi, vp.loai_loi) as ten_hien_thi, COUNT(*) as so_luong
@@ -172,14 +206,72 @@ giaiTrinh.get("/bao-cao", async (c) => {
     .bind(maKtv, thang)
     .all<{ loai_loi: string; ten_hien_thi: string; so_luong: number }>();
 
-  const theoLoaiLoi = loaiLoiRows.map((r) => ({
-    loaiLoi: r.loai_loi,
-    tenHienThi: r.ten_hien_thi,
-    soLuong: r.so_luong,
-    tyLe: daChot > 0 ? Math.round((r.so_luong / daChot) * 1000) / 10 : 0,
-  }));
+  const { results: nghiNgoRows } = await c.env.DB.prepare(
+    `${BAO_CAO_CTE} SELECT vp.loai_loi as ma, COALESCE(ll.ten_hien_thi, vp.loai_loi) as ten_hien_thi,
+        COUNT(*) as tong,
+        SUM(CASE WHEN vp.chot_bo_cap_2 = 1 THEN 1 ELSE 0 END) as da_chot,
+        SUM(CASE WHEN vp.chot_bo_cap_2 = 0 THEN 1 ELSE 0 END) as da_bo
+     FROM vp LEFT JOIN loai_loi_mo_ta ll ON ll.ma = vp.loai_loi
+     GROUP BY vp.loai_loi ORDER BY tong DESC`,
+  )
+    .bind(maKtv, thang)
+    .all<{ ma: string; ten_hien_thi: string; tong: number; da_chot: number; da_bo: number }>();
 
-  return c.json({ thang, thongKe: { tong, dangCho, quaHan, daChot, daBo }, theoLoaiLoi });
+  const { results: kq1Rows } = await c.env.DB.prepare(
+    `${BAO_CAO_CTE} SELECT COALESCE(vp.ket_qua_cap_1, '') as ma, COALESCE(kq.ten_hien_thi, vp.ket_qua_cap_1, 'Chưa có kết luận') as ten_hien_thi,
+        COUNT(*) as tong,
+        SUM(CASE WHEN vp.chot_bo_cap_2 = 1 THEN 1 ELSE 0 END) as da_chot,
+        SUM(CASE WHEN vp.chot_bo_cap_2 = 0 THEN 1 ELSE 0 END) as da_bo
+     FROM vp LEFT JOIN ket_qua_cap_1_mo_ta kq ON kq.ma = vp.ket_qua_cap_1
+     GROUP BY vp.ket_qua_cap_1 ORDER BY tong DESC`,
+  )
+    .bind(maKtv, thang)
+    .all<{ ma: string; ten_hien_thi: string; tong: number; da_chot: number; da_bo: number }>();
+
+  const congViec = await congViecPromise;
+
+  const nhomNghiNgo = (rows: { ma: string; ten_hien_thi: string; tong: number; da_chot: number; da_bo: number }[]) =>
+    rows.map((r) => ({
+      ma: r.ma,
+      tenHienThi: r.ten_hien_thi,
+      tong: r.tong,
+      daChot: r.da_chot,
+      daBo: r.da_bo,
+      tyLeTrenTong: tyLe(r.tong, tong),
+      tyLeChotLoi: tyLe(r.da_chot, r.da_chot + r.da_bo),
+    }));
+
+  return c.json({
+    thang,
+    thongKe: {
+      tong,
+      soCase: tk?.so_case ?? 0,
+      dangCho: Math.max(0, tong - quaHan - daChot - daBo),
+      quaHan,
+      daChot,
+      daBo,
+      tyLeChotLoi: tyLe(daChot, daChot + daBo),
+    },
+    giaiTrinh: {
+      daGiaiTrinh,
+      chuaGiaiTrinh,
+      dungHan,
+      tyLeGiaiTrinh: tyLe(daGiaiTrinh, daGiaiTrinh + chuaGiaiTrinh),
+      tyLeDungHan: tyLe(dungHan, daGiaiTrinh),
+    },
+    theoLoaiLoi: loaiLoiRows.map((r) => ({ loaiLoi: r.loai_loi, tenHienThi: r.ten_hien_thi, soLuong: r.so_luong, tyLe: tyLe(r.so_luong, daChot) })),
+    theoLoaiNghiNgo: nhomNghiNgo(nghiNgoRows),
+    theoKetQuaCap1: nhomNghiNgo(kq1Rows),
+    // null = chua tung lay duoc so lieu DVBH cho thang nay. row null = DVBH co du lieu nhung KTV nay khong co ca nao.
+    congViec: congViec.payload
+      ? {
+          row: congViec.payload.rows.find((r) => r.ma_ktv === maKtv) ?? null,
+          tinhLuc: congViec.payload.tinh_luc,
+          layLuc: congViec.layLuc,
+          loi: congViec.loi,
+        }
+      : null,
+  });
 });
 
 // GET /vi-pham/:id - chi tiet 1 vi pham, kem giai trinh da nop (neu co) - 403 neu khong phai vi
