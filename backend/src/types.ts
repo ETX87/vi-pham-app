@@ -2,7 +2,9 @@
 // trinh vi pham" can (xem ke hoach xay dung, phan "vai_tro (Admin | NULL)"). Khong co he thong
 // "modules"/nhieu vai tro nghiep vu nhu linh-kien-app - MVP chi phan biet Admin vs KTV thuong.
 
-export type VaiTro = "Admin";
+// "Giam sat" (GS khu vuc) / "View" (xem toan bo) - 2 vai tro CHI XEM, luu o cot users.vai_tro_xem
+// (migration 0011), doc gop voi users.vai_tro thanh 1 gia tri duy nhat (xem middleware/loadUser.ts).
+export type VaiTro = "Admin" | "Giam sat" | "View";
 
 export type TrangThaiDuyet = "Cho duyet" | "Da duyet" | "Tu choi";
 

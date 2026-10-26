@@ -1,7 +1,10 @@
 export interface AppUser {
   email: string;
   ten: string | null;
-  vai_tro: "Admin" | null;
+  // "Giam sat" (GS khu vuc) / "View" (xem toan bo) - 2 vai tro chi xem, khong co man Quan tri.
+  vai_tro: "Admin" | "Giam sat" | "View" | null;
+  // Chi co o GET /admin/users: khu vuc GS phu trach.
+  khu_vuc?: string[];
   trang_thai_duyet: "Cho duyet" | "Da duyet" | "Tu choi";
   bi_khoa: boolean;
   ma_ktv_tu_khai?: string | null;

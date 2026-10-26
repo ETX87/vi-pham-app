@@ -186,11 +186,92 @@ function moLinkSuaKtv(email: string) {
   window.open(`${LINH_KIEN_APP_URL}/?ktvSearch=${encodeURIComponent(email)}`, "_blank", "noopener,noreferrer");
 }
 
+// Vai tro dang nhap: KTV (NULL) chi xem cua minh; Giam sat xem KTV thuoc khu vuc duoc gan; View xem toan bo
+// (2 vai tro nay CHI XEM, khong co man Quan tri); Admin toan quyen. Xem backend lib/phamVi.ts.
+const VAI_TRO_OPTIONS: { value: "" | NonNullable<AppUser["vai_tro"]>; label: string }[] = [
+  { value: "", label: "KTV" },
+  { value: "Giam sat", label: "GS khu vực" },
+  { value: "View", label: "View (xem tất cả)" },
+  { value: "Admin", label: "Admin" },
+];
+
+interface KhuVucOption {
+  ma: string;
+  so_ktv: number;
+}
+
+// Chon khu vuc phu trach cho 1 tai khoan Giam sat - ma khu vuc lay tu danh ba KTV (dong bo tu linh-kien-app).
+function ChonKhuVucGs({ value, options, busy, onSave }: { value: string[]; options: KhuVucOption[]; busy: boolean; onSave: (v: string[]) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [chon, setChon] = useState<string[]>(value);
+
+  if (!editing)
+    return (
+      <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {value.length ? (
+          value.map((k) => (
+            <span key={k} className="tag tag-done">
+              {k}
+            </span>
+          ))
+        ) : (
+          <span className="tag tag-pending">Chưa gán khu vực - GS chưa xem được KTV nào</span>
+        )}
+        <button
+          className="btn btn-sm"
+          onClick={() => {
+            setChon(value);
+            setEditing(true);
+          }}
+        >
+          Sửa khu vực
+        </button>
+      </div>
+    );
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {options.map((o) => (
+          <label key={o.ma} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={chon.includes(o.ma)}
+              onChange={(e) => setChon((prev) => (e.target.checked ? [...prev, o.ma] : prev.filter((k) => k !== o.ma)))}
+            />
+            {o.ma} <span style={{ color: "var(--ink-400)" }}>({o.so_ktv})</span>
+          </label>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <button
+          className="btn btn-primary btn-sm"
+          disabled={busy}
+          onClick={() => {
+            onSave(chon);
+            setEditing(false);
+          }}
+        >
+          Lưu khu vực
+        </button>
+        <button className="btn btn-sm" onClick={() => setEditing(false)}>
+          Hủy
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function QuanLyTaiKhoan() {
   const [tab, setTab] = useState<"cho-duyet" | "da-duyet" | "tu-choi" | "tat-ca">("cho-duyet");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<AppUser[] | null>(null);
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
+  const [khuVucOptions, setKhuVucOptions] = useState<KhuVucOption[]>([]);
+
+  useEffect(() => {
+    api.get<{ rows: KhuVucOption[] }>("/admin/users/khu-vuc-options").then((r) => setKhuVucOptions(r.rows)).catch(() => {});
+  }, []);
 
   function load() {
     setRows(null);
@@ -203,7 +284,7 @@ function QuanLyTaiKhoan() {
 
   useEffect(load, [tab]);
 
-  async function patch(email: string, body: Partial<Pick<AppUser, "trang_thai_duyet" | "vai_tro" | "bi_khoa">>) {
+  async function patch(email: string, body: Partial<Pick<AppUser, "trang_thai_duyet" | "vai_tro" | "bi_khoa" | "khu_vuc">>) {
     setBusyEmail(email);
     try {
       await api.patch(`/admin/users/${encodeURIComponent(email)}`, body);
@@ -255,7 +336,7 @@ function QuanLyTaiKhoan() {
                     <div className="card-title">{u.ten || u.email}</div>
                     <div className="card-meta" style={{ marginTop: 4 }}>
                       <span>{u.email}</span>
-                      {u.vai_tro === "Admin" && <span>Admin</span>}
+                      {u.vai_tro && <span>{VAI_TRO_OPTIONS.find((o) => o.value === u.vai_tro)?.label ?? u.vai_tro}</span>}
                     </div>
                     {u.ma_ktv_tu_khai && (
                       <div className="card-meta" style={{ marginTop: 2 }}>
@@ -271,6 +352,9 @@ function QuanLyTaiKhoan() {
                         <span className="tag tag-pending">Chưa khớp KTV nào trong danh bạ</span>
                       )}
                     </div>
+                    {u.vai_tro === "Giam sat" && (
+                      <ChonKhuVucGs value={u.khu_vuc ?? []} options={khuVucOptions} busy={busy} onSave={(kv) => patch(u.email, { khu_vuc: kv })} />
+                    )}
                   </div>
                   <span className={`tag ${st.cls}`}>{st.label}</span>
                 </div>
@@ -294,9 +378,18 @@ function QuanLyTaiKhoan() {
                     </button>
                   )}
                   {u.trang_thai_duyet === "Da duyet" && (
-                    <button className="btn btn-sm" disabled={busy} onClick={() => patch(u.email, { vai_tro: u.vai_tro === "Admin" ? null : "Admin" })}>
-                      {u.vai_tro === "Admin" ? "Bỏ quyền Admin" : "Gán quyền Admin"}
-                    </button>
+                    <select
+                      value={u.vai_tro ?? ""}
+                      disabled={busy}
+                      title="Vai trò đăng nhập"
+                      onChange={(e) => patch(u.email, { vai_tro: (e.target.value || null) as AppUser["vai_tro"] })}
+                    >
+                      {VAI_TRO_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          Vai trò: {o.label}
+                        </option>
+                      ))}
+                    </select>
                   )}
                 </div>
                 {u.bi_khoa === true && <div className="alert alert-error" style={{ marginTop: 8 }}>Tài khoản đang bị khóa - không đăng nhập được.</div>}

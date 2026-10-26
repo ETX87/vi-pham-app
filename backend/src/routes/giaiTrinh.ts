@@ -7,6 +7,7 @@ import { syncGiaiTrinhToDvbh, type GiaiTrinhSyncRow } from "../lib/dvbhClient";
 import { nowVN, todayVN } from "../lib/vnTime";
 import { getCachedCaseLookup, syncCaseLookup } from "../lib/caseLookupCache";
 import { getThongKeDvbh, type ThongKeDvbhRow } from "../lib/thongKeDvbh";
+import { duocXemViPham, dsKtvCuaGs, emailNhomGs, sqlKtvCuaGs, xemNhieuKtv } from "../lib/phamVi";
 
 // Route session-authenticated cho KTV: xem danh sach vi pham cua CHINH MINH, xem chi tiet, upload
 // anh bang chung, nop giai trinh - xem ke hoach xay dung phan "giaiTrinh.ts".
@@ -20,14 +21,30 @@ async function getMaKtvForEmail(db: D1Database, email: string): Promise<string |
   return row?.ma_ktv ?? null;
 }
 
-/** Admin duoc XEM (khong phai nop ho) vi pham cua BAT KY KTV nao - xem phan hoi nguoi dung "cho
- * phep click vao card vi pham de xem noi dung ben trong nhu ktv dang xem". Chi ap dung cho cac
- * route GET/doc du lieu (chi tiet, case-lookup) - POST .../anh va .../giai-trinh VAN chi chu so
- * huu moi goi duoc, Admin khong nop giai trinh thay KTV. */
-function duocXemViPham(vaiTro: "Admin" | null, maKtv: string | null, chuSoHuu: string | null): boolean {
-  if (vaiTro === "Admin") return true;
-  return !!maKtv && maKtv === chuSoHuu;
-}
+// Admin/View/GS duoc XEM (khong phai nop ho) vi pham cua KTV khac trong pham vi cua minh - xem
+// lib/phamVi.ts duocXemViPham(). Chi ap dung cho cac route GET/doc du lieu (chi tiet, case-lookup) -
+// POST .../anh va .../giai-trinh VAN chi chu so huu moi goi duoc.
+
+// GET /ktv-options - danh sach KTV cho o chon KTV (man Vi pham / Bao cao nhanh) theo pham vi: Admin/View
+// = toan bo, GS = KTV thuoc khu vuc duoc gan (kem "khuVuc" de hien "Toan nhom (MB1, MB2)"). KTV thuong 403.
+giaiTrinh.get("/ktv-options", async (c) => {
+  const user = c.get("user");
+  if (!xemNhieuKtv(user)) return c.json({ error: "FORBIDDEN" }, 403);
+  const nhom = emailNhomGs(user);
+  if (!nhom) {
+    const { results } = await c.env.DB.prepare("SELECT ma_ktv, ten_hien_thi, email_dang_nhap FROM ktv_lien_he ORDER BY ten_hien_thi").all();
+    return c.json({ rows: results, khuVuc: null });
+  }
+  const { results } = await c.env.DB.prepare(
+    `SELECT ma_ktv, ten_hien_thi, email_dang_nhap FROM ktv_lien_he WHERE ma_ktv IN (${sqlKtvCuaGs("?")}) ORDER BY ten_hien_thi`,
+  )
+    .bind(nhom)
+    .all();
+  const { results: kv } = await c.env.DB.prepare("SELECT khu_vuc_ma FROM user_khu_vuc WHERE user_email = ? ORDER BY khu_vuc_ma")
+    .bind(nhom)
+    .all<{ khu_vuc_ma: string }>();
+  return c.json({ rows: results, khuVuc: kv.map((r) => r.khu_vuc_ma) });
+});
 
 interface ViPhamRow {
   id: string;
@@ -73,7 +90,8 @@ function dieuKienTrangThai(trangThai: string | undefined): string {
   }
 }
 
-// ?1 = ma_ktv can loc (NULL = toan doi, chi Admin), ?2 = ma_ktv cua nguoi dang xem (de danh dau la_cua_toi).
+// ?1 = ma_ktv can loc (NULL = toan doi), ?2 = ma_ktv cua nguoi dang xem (de danh dau la_cua_toi),
+// ?3 = email GS de gioi han trong KTV khu vuc minh (NULL = khong gioi han - Admin/View/KTV thuong).
 const VP_EXT_CTE = `WITH vp_ext AS (
   SELECT vp.*,
          EXISTS(SELECT 1 FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = vp.id) as da_giai_trinh,
@@ -81,6 +99,7 @@ const VP_EXT_CTE = `WITH vp_ext AS (
          (SELECT k.ten_hien_thi FROM ktv_lien_he k WHERE k.ma_ktv = vp.ky_thuat_vien_ma_ktv) as ten_ktv_khop,
          CASE WHEN vp.ky_thuat_vien_ma_ktv = ?2 THEN 1 ELSE 0 END as la_cua_toi
   FROM vi_pham vp WHERE (?1 IS NULL OR vp.ky_thuat_vien_ma_ktv = ?1)
+    AND (?3 IS NULL OR vp.ky_thuat_vien_ma_ktv IN (${sqlKtvCuaGs("?3")}))
 )`;
 
 // GET /vi-pham?trang_thai=...&page=1 - danh sach vi pham cua CHINH KTV dang dang nhap, moi nhat
@@ -88,14 +107,16 @@ const VP_EXT_CTE = `WITH vp_ext AS (
 // /thong-bao) de tranh doc het toan bo vi pham moi lan mo man hinh. "thongKe" (dem theo tung trang
 // thai + tong) va "chuaXuLy" (badge) luon tinh TREN TOAN BO vi pham cua KTV nay (khong theo
 // trang_thai/page dang xem) bang 1 cau aggregate RIENG, KHONG phai tu "rows" cua trang hien tai.
-// Admin (2026-10-26): ?ma_ktv= xem 1 KTV, ?toan_doi=1 xem ca doi; khong truyen gi = cua chinh minh nhu KTV thuong (App.tsx
-// goi kieu nay de lay badge - neu mac dinh toan doi thi badge Admin se cong ca doi). KTV thuong bo qua 2 tham so nay.
+// Admin/View/GS (2026-10-26): ?ma_ktv= xem 1 KTV, ?toan_doi=1 xem ca doi (GS: toan nhom khu vuc minh); khong truyen gi =
+// cua chinh minh nhu KTV thuong (App.tsx goi kieu nay de lay badge - neu mac dinh toan doi thi badge se cong ca doi).
+// KTV thuong bo qua 2 tham so nay. GS chon 1 KTV ngoai khu vuc -> dieu kien ?3 loc het, tra rong.
 giaiTrinh.get("/vi-pham", async (c) => {
   const user = c.get("user");
   const maKtv = await getMaKtvForEmail(c.env.DB, user.email);
-  const laAdmin = user.vai_tro === "Admin";
-  const maKtvChon = laAdmin ? c.req.query("ma_ktv")?.trim() || null : null;
-  const toanDoi = laAdmin && !maKtvChon && c.req.query("toan_doi") === "1";
+  const xemNhieu = xemNhieuKtv(user);
+  const maKtvChon = xemNhieu ? c.req.query("ma_ktv")?.trim() || null : null;
+  const toanDoi = xemNhieu && !maKtvChon && c.req.query("toan_doi") === "1";
+  const nhom = maKtvChon || toanDoi ? emailNhomGs(user) : null;
   const loc = maKtvChon ?? (toanDoi ? null : maKtv);
   if (!loc && !toanDoi) return c.json({ rows: [], hasMore: false, chuaXuLy: 0, thongKe: { tong: 0, chuaGiaiTrinh: 0, quaHan: 0, choChot: 0, daChot: 0 } });
 
@@ -104,9 +125,9 @@ giaiTrinh.get("/vi-pham", async (c) => {
   const offset = (page - 1) * VI_PHAM_PAGE_SIZE;
 
   const { results } = await c.env.DB.prepare(
-    `${VP_EXT_CTE} SELECT * FROM vp_ext WHERE ${dieuKienTrangThai(trangThai)} ORDER BY ngay_ghi_nhan DESC LIMIT ?3 OFFSET ?4`,
+    `${VP_EXT_CTE} SELECT * FROM vp_ext WHERE ${dieuKienTrangThai(trangThai)} ORDER BY ngay_ghi_nhan DESC LIMIT ?4 OFFSET ?5`,
   )
-    .bind(loc, maKtv, VI_PHAM_PAGE_SIZE + 1, offset)
+    .bind(loc, maKtv, nhom, VI_PHAM_PAGE_SIZE + 1, offset)
     .all<ViPhamRow>();
   const hasMore = results.length > VI_PHAM_PAGE_SIZE;
   const rows = hasMore ? results.slice(0, VI_PHAM_PAGE_SIZE) : results;
@@ -123,7 +144,7 @@ giaiTrinh.get("/vi-pham", async (c) => {
         SUM(CASE WHEN da_giai_trinh = 0 AND (chot_bo_cap_2 IS NULL OR chot_bo_cap_2 != 0) THEN 1 ELSE 0 END) as chua_xu_ly
      FROM vp_ext`,
   )
-    .bind(loc, maKtv)
+    .bind(loc, maKtv, nhom)
     .first<{ tong: number; chua_giai_trinh: number; qua_han: number; cho_chot: number; da_chot: number; chua_xu_ly: number }>();
 
   return c.json({
@@ -146,14 +167,16 @@ function tyLe(tu: number, mau: number): number {
 }
 
 // Moi vi pham trong 1 thang + thoi diem nop giai trinh DAU TIEN (gt_dau, gio VN - cung quy uoc voi
-// ngay_ghi_nhan nen so sanh chuoi truc tiep duoc). ?1 = ma_ktv (NULL = toan doi, chi Admin), ?2 = thang.
+// ngay_ghi_nhan nen so sanh chuoi truc tiep duoc). ?1 = ma_ktv (NULL = toan doi), ?2 = thang, ?3 = email GS
+// (gioi han KTV khu vuc minh, NULL = khong gioi han).
 // Dung chung cho moi cau aggregate cua /bao-cao ben duoi.
 const BAO_CAO_CTE = `WITH vp AS (
   SELECT v.*, (SELECT MIN(gt.tao_luc) FROM vi_pham_giai_trinh gt WHERE gt.vi_pham_id = v.id) as gt_dau
   FROM vi_pham v WHERE (?1 IS NULL OR v.ky_thuat_vien_ma_ktv = ?1) AND substr(v.ngay_ghi_nhan, 1, 7) = ?2
+    AND (?3 IS NULL OR v.ky_thuat_vien_ma_ktv IN (${sqlKtvCuaGs("?3")}))
 )`;
 
-/** Cong gop so lieu DVBH nhieu KTV (Admin xem toan doi). Thoi gian xu ly TB = trung binh co trong so theo
+/** Cong gop so lieu DVBH nhieu KTV (Admin/View xem toan doi, GS xem toan nhom). Thoi gian xu ly TB = trung binh co trong so theo
  * ca_hoan_thanh - xap xi, vi DVBH khong tra so ca co so_gio_xu_ly hop le cua tung KTV. */
 function congGopCongViec(rows: ThongKeDvbhRow[]): ThongKeDvbhRow {
   const g: ThongKeDvbhRow = {
@@ -200,12 +223,13 @@ function congGopCongViec(rows: ThongKeDvbhRow[]): ThongKeDvbhRow {
 // - "theoLoaiLoi": CHI vi pham DA CHOT LA LOI THAT, ty le tren tong da chot (yeu cau cu, giu nguyen).
 // - "theoLoaiNghiNgo"/"theoKetQuaCap1": tren TOAN BO nghi ngo trong thang, kem ty le chot thanh loi.
 // - "congViec": so lieu ca cua KTV tu DVBH (tong ca, dung han, 24h, toc do xu ly...) - lib/thongKeDvbh.ts, cache 1h.
-// Pham vi: KTV thuong = CHI cua minh (bo qua ?ma_ktv). Admin = toan doi, hoac 1 KTV qua ?ma_ktv - Admin khong gan
-// KTV nao nen truoc day man nay cua Admin toan so 0 va khong goi DVBH lan nao.
+// Pham vi: KTV thuong = CHI cua minh (bo qua ?ma_ktv). Admin/View = toan doi, GS = toan nhom (KTV khu vuc minh), hoac
+// 1 KTV qua ?ma_ktv - Admin khong gan KTV nao nen truoc day man nay cua Admin toan so 0 va khong goi DVBH lan nao.
 giaiTrinh.get("/bao-cao", async (c) => {
   const user = c.get("user");
-  const laAdmin = user.vai_tro === "Admin";
+  const laAdmin = xemNhieuKtv(user);
   const maKtv = laAdmin ? c.req.query("ma_ktv")?.trim() || null : await getMaKtvForEmail(c.env.DB, user.email);
+  const nhom = laAdmin ? emailNhomGs(user) : null;
   const thang = /^\d{4}-\d{2}$/.test(c.req.query("thang") ?? "") ? c.req.query("thang")! : todayVN().slice(0, 7);
 
   if (!laAdmin && !maKtv) {
@@ -222,6 +246,8 @@ giaiTrinh.get("/bao-cao", async (c) => {
 
   // Goi song song voi cac cau D1 ben duoi - lan dau trong gio phai cho DVBH tra loi.
   const congViecPromise = getThongKeDvbh(c.env, thang);
+  // GS: so lieu DVBH (cache JSON toan doi) phai loc tay theo KTV khu vuc minh truoc khi cong gop.
+  const ktvNhom = nhom ? await dsKtvCuaGs(c.env.DB, nhom) : null;
 
   const tk = await c.env.DB.prepare(
     `${BAO_CAO_CTE} SELECT
@@ -235,7 +261,7 @@ giaiTrinh.get("/bao-cao", async (c) => {
         SUM(CASE WHEN gt_dau IS NOT NULL AND gt_dau <= datetime(ngay_ghi_nhan, '+48 hours') THEN 1 ELSE 0 END) as dung_han
      FROM vp`,
   )
-    .bind(maKtv, thang)
+    .bind(maKtv, thang, nhom)
     .first<{ tong: number; so_case: number; qua_han: number; da_chot: number; da_bo: number; da_giai_trinh: number; chua_giai_trinh: number; dung_han: number }>();
 
   const tong = tk?.tong ?? 0;
@@ -250,9 +276,10 @@ giaiTrinh.get("/bao-cao", async (c) => {
     `SELECT vp.loai_loi, COALESCE(ll.ten_hien_thi, vp.loai_loi) as ten_hien_thi, COUNT(*) as so_luong
      FROM vi_pham vp LEFT JOIN loai_loi_mo_ta ll ON ll.ma = vp.loai_loi
      WHERE (?1 IS NULL OR vp.ky_thuat_vien_ma_ktv = ?1) AND substr(vp.ngay_ghi_nhan, 1, 7) = ?2 AND vp.chot_bo_cap_2 = 1
+       AND (?3 IS NULL OR vp.ky_thuat_vien_ma_ktv IN (${sqlKtvCuaGs("?3")}))
      GROUP BY vp.loai_loi, ten_hien_thi ORDER BY so_luong DESC`,
   )
-    .bind(maKtv, thang)
+    .bind(maKtv, thang, nhom)
     .all<{ loai_loi: string; ten_hien_thi: string; so_luong: number }>();
 
   const { results: nghiNgoRows } = await c.env.DB.prepare(
@@ -263,7 +290,7 @@ giaiTrinh.get("/bao-cao", async (c) => {
      FROM vp LEFT JOIN loai_loi_mo_ta ll ON ll.ma = vp.loai_loi
      GROUP BY vp.loai_loi ORDER BY tong DESC`,
   )
-    .bind(maKtv, thang)
+    .bind(maKtv, thang, nhom)
     .all<{ ma: string; ten_hien_thi: string; tong: number; da_chot: number; da_bo: number }>();
 
   const { results: kq1Rows } = await c.env.DB.prepare(
@@ -274,7 +301,7 @@ giaiTrinh.get("/bao-cao", async (c) => {
      FROM vp LEFT JOIN ket_qua_cap_1_mo_ta kq ON kq.ma = vp.ket_qua_cap_1
      GROUP BY vp.ket_qua_cap_1 ORDER BY tong DESC`,
   )
-    .bind(maKtv, thang)
+    .bind(maKtv, thang, nhom)
     .all<{ ma: string; ten_hien_thi: string; tong: number; da_chot: number; da_bo: number }>();
 
   const congViec = await congViecPromise;
@@ -314,7 +341,11 @@ giaiTrinh.get("/bao-cao", async (c) => {
     // null = chua tung lay duoc so lieu DVBH cho thang nay. row null = DVBH co du lieu nhung KTV nay khong co ca nao.
     congViec: congViec.payload
       ? {
-          row: maKtv ? (congViec.payload.rows.find((r) => r.ma_ktv === maKtv) ?? null) : congGopCongViec(congViec.payload.rows),
+          row: maKtv
+            ? ktvNhom && !ktvNhom.has(maKtv)
+              ? null
+              : (congViec.payload.rows.find((r) => r.ma_ktv === maKtv) ?? null)
+            : congGopCongViec(ktvNhom ? congViec.payload.rows.filter((r) => ktvNhom.has(r.ma_ktv)) : congViec.payload.rows),
           tinhLuc: congViec.payload.tinh_luc,
           layLuc: congViec.layLuc,
           loi: congViec.loi,
@@ -323,9 +354,8 @@ giaiTrinh.get("/bao-cao", async (c) => {
   });
 });
 
-// GET /vi-pham/:id - chi tiet 1 vi pham, kem giai trinh da nop (neu co) - 403 neu khong phai vi
-// pham cua chinh minh VA khong phai Admin (xem duocXemViPham() - Admin xem duoc CUA BAT KY KTV nao,
-// KTV thuong chi xem duoc cua chinh minh).
+// GET /vi-pham/:id - chi tiet 1 vi pham, kem giai trinh da nop (neu co) - 403 neu ngoai pham vi xem
+// (lib/phamVi.ts duocXemViPham(): Admin/View moi KTV, GS KTV khu vuc minh, KTV thuong chi cua minh).
 giaiTrinh.get("/vi-pham/:id", async (c) => {
   const user = c.get("user");
   const maKtv = await getMaKtvForEmail(c.env.DB, user.email);
@@ -343,7 +373,7 @@ giaiTrinh.get("/vi-pham/:id", async (c) => {
     .bind(id)
     .first<ViPhamRow & { ky_thuat_vien_ma_ktv: string | null }>();
   if (!viPham) return c.json({ error: "NOT_FOUND" }, 404);
-  if (!duocXemViPham(user.vai_tro, maKtv, viPham.ky_thuat_vien_ma_ktv)) return c.json({ error: "FORBIDDEN" }, 403);
+  if (!(await duocXemViPham(c.env.DB, user, maKtv, viPham.ky_thuat_vien_ma_ktv))) return c.json({ error: "FORBIDDEN" }, 403);
 
   const giaiTrinhRows = await c.env.DB.prepare("SELECT * FROM vi_pham_giai_trinh WHERE vi_pham_id = ? ORDER BY tao_luc DESC").bind(id).all();
 
@@ -360,7 +390,7 @@ giaiTrinh.get("/vi-pham/:id/case-lookup", async (c) => {
 
   const viPham = await c.env.DB.prepare("SELECT case_id, ky_thuat_vien_ma_ktv FROM vi_pham WHERE id = ?").bind(id).first<{ case_id: string | null; ky_thuat_vien_ma_ktv: string | null }>();
   if (!viPham) return c.json({ error: "NOT_FOUND" }, 404);
-  if (!duocXemViPham(user.vai_tro, maKtv, viPham.ky_thuat_vien_ma_ktv)) return c.json({ error: "FORBIDDEN" }, 403);
+  if (!(await duocXemViPham(c.env.DB, user, maKtv, viPham.ky_thuat_vien_ma_ktv))) return c.json({ error: "FORBIDDEN" }, 403);
   if (!viPham.case_id) return c.json({ cached: null });
 
   const cached = await getCachedCaseLookup(c.env.DB, viPham.case_id);
@@ -377,7 +407,7 @@ giaiTrinh.post("/vi-pham/:id/case-lookup/sync", async (c) => {
 
   const viPham = await c.env.DB.prepare("SELECT case_id, ky_thuat_vien_ma_ktv FROM vi_pham WHERE id = ?").bind(id).first<{ case_id: string | null; ky_thuat_vien_ma_ktv: string | null }>();
   if (!viPham) return c.json({ error: "NOT_FOUND" }, 404);
-  if (!duocXemViPham(user.vai_tro, maKtv, viPham.ky_thuat_vien_ma_ktv)) return c.json({ error: "FORBIDDEN" }, 403);
+  if (!(await duocXemViPham(c.env.DB, user, maKtv, viPham.ky_thuat_vien_ma_ktv))) return c.json({ error: "FORBIDDEN" }, 403);
   if (!viPham.case_id) return c.json({ error: "NO_CASE_ID" }, 400);
 
   const outcome = await syncCaseLookup(c.env, c.env.DB, user.email, viPham.case_id);

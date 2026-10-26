@@ -21,7 +21,7 @@ function MainApp() {
   const state = useAuth();
   const [tab, setTab] = useState<Tab>("vi-pham");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Admin mo vi pham cua KTV khac tu "Vi pham" (chon KTV/toan doi) -> chi xem, giong AdminScreen.
+  // Admin/View/GS mo vi pham cua KTV khac tu "Vi pham" (chon KTV/toan doi) -> chi xem, giong AdminScreen.
   const [selectedReadOnly, setSelectedReadOnly] = useState(false);
   const [viPhamKtv, setViPhamKtv] = useState("");
   const push = usePushNotifications();
@@ -86,6 +86,8 @@ function MainApp() {
   if (state.status !== "authenticated") return null;
   const { user } = state;
   const isAdmin = user.vai_tro === "Admin";
+  // Admin/View/GS: chon KTV hoac xem toan doi (GS: toan nhom khu vuc minh) o Vi pham + Bao cao nhanh, chi xem.
+  const xemNhieu = isAdmin || user.vai_tro === "View" || user.vai_tro === "Giam sat";
 
   function goToViPham(id: string) {
     setTab("vi-pham");
@@ -110,7 +112,7 @@ function MainApp() {
               setSelectedId(null);
             }}
           >
-            Vi phạm của tôi {viPhamBadge > 0 && <span className="badge">{viPhamBadge}</span>}
+            {xemNhieu ? "Vi phạm" : "Vi phạm của tôi"} {viPhamBadge > 0 && <span className="badge">{viPhamBadge}</span>}
           </button>
           <button className={`topbar-tab ${tab === "bao-cao" ? "active" : ""}`} onClick={() => setTab("bao-cao")}>
             Báo cáo nhanh
@@ -152,7 +154,7 @@ function MainApp() {
         {tab === "admin" && isAdmin ? (
           <AdminScreen />
         ) : tab === "bao-cao" ? (
-          <BaoCaoScreen isAdmin={isAdmin} />
+          <BaoCaoScreen xemNhieu={xemNhieu} />
         ) : tab === "thong-bao" ? (
           <NotificationsScreen onSelectViPham={goToViPham} onChanged={refreshBadges} />
         ) : tab === "tai-khoan" ? (
@@ -165,7 +167,7 @@ function MainApp() {
               setSelectedReadOnly(readOnly);
               setSelectedId(id);
             }}
-            isAdmin={isAdmin}
+            xemNhieu={xemNhieu}
             maKtv={viPhamKtv}
             setMaKtv={setViPhamKtv}
           />

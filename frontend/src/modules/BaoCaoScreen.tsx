@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Clock3, AlertTriangle, CheckCircle2, XCircle, FileCheck2, FileClock, Timer } from "lucide-react";
 import { api } from "../api/client";
 import { KtvCombobox } from "../components/KtvCombobox";
-import type { KtvOption } from "../types";
+import { useKtvOptions } from "../hooks/useKtvOptions";
 
 interface ThongKeThang {
   tong: number;
@@ -323,25 +323,21 @@ function TheCongViec({ cv }: { cv: CongViec | null }) {
   );
 }
 
-// Admin: mac dinh xem TOAN DOI, chon 1 KTV de xem rieng (backend chi nhan ?ma_ktv tu Admin). KTV thuong: chi cua minh.
-export function BaoCaoScreen({ isAdmin }: { isAdmin: boolean }) {
+// Admin/View: mac dinh xem TOAN DOI, GS: TOAN NHOM (KTV khu vuc minh); chon 1 KTV de xem rieng (backend chi nhan
+// ?ma_ktv tu 3 vai tro nay). KTV thuong: chi cua minh.
+export function BaoCaoScreen({ xemNhieu }: { xemNhieu: boolean }) {
   const [thang, setThang] = useState(thangHienTai());
   const [maKtv, setMaKtv] = useState("");
-  const [ktvOptions, setKtvOptions] = useState<KtvOption[]>([]);
+  const ktv = useKtvOptions(xemNhieu);
   const [data, setData] = useState<BaoCaoResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isAdmin) return;
-    api.get<{ rows: KtvOption[] }>("/admin/vi-pham/ktv-options").then((r) => setKtvOptions(r.rows)).catch(() => {});
-  }, [isAdmin]);
-
-  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    const qs = new URLSearchParams({ thang, ...(isAdmin && maKtv ? { ma_ktv: maKtv } : {}) });
+    const qs = new URLSearchParams({ thang, ...(xemNhieu && maKtv ? { ma_ktv: maKtv } : {}) });
     api
       .get<BaoCaoResponse>(`/giai-trinh/bao-cao?${qs.toString()}`)
       .then((res) => !cancelled && setData(res))
@@ -350,15 +346,15 @@ export function BaoCaoScreen({ isAdmin }: { isAdmin: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [thang, maKtv, isAdmin]);
+  }, [thang, maKtv, xemNhieu]);
 
   return (
     <div>
       <div className="section-title" style={{ marginTop: 0, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <span>Báo cáo nhanh{isAdmin && !maKtv ? " · toàn đội" : ""}</span>
+        <span>Báo cáo nhanh{xemNhieu && !maKtv ? (ktv.khuVuc ? " · toàn nhóm" : " · toàn đội") : ""}</span>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          {isAdmin && (
-            <KtvCombobox value={maKtv} onChange={setMaKtv} options={ktvOptions} allLabel="Toàn đội" containerStyle={{ minWidth: 220 }} />
+          {xemNhieu && (
+            <KtvCombobox value={maKtv} onChange={setMaKtv} options={ktv.options} allLabel={ktv.allLabel} containerStyle={{ minWidth: 220 }} />
           )}
           <input type="month" value={thang} max={thangHienTai()} onChange={(e) => e.target.value && setThang(e.target.value)} />
         </div>

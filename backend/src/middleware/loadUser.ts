@@ -1,13 +1,13 @@
 import type { Context, Next } from "hono";
-import type { AppUser, Env } from "../types";
+import type { AppUser, Env, VaiTro } from "../types";
 
 // Rut gon tu linh-kien-app backend/src/middleware/loadUser.ts - khong co "xem thu vai tro" (view-
 // as, chi Admin/QC/Giam sat cua linh-kien-app moi can), khong co cac co vai tro nghiep vu rieng -
-// he nay chi phan biet Admin (vai_tro = 'Admin') vs KTV thuong (vai_tro NULL).
+// he nay phan biet Admin / Giam sat / View (2 vai tro chi xem, cot vai_tro_xem - migration 0011) vs KTV thuong (NULL).
 interface UserRow {
   email: string;
   ten: string | null;
-  vai_tro: "Admin" | null;
+  vai_tro: VaiTro | null;
   trang_thai_duyet: "Cho duyet" | "Da duyet" | "Tu choi";
   bi_khoa: number;
 }
@@ -15,7 +15,7 @@ interface UserRow {
 export async function loadUser(c: Context<{ Bindings: Env }>, next: Next) {
   const email = c.get("email");
 
-  let row = await c.env.DB.prepare("SELECT email, ten, vai_tro, trang_thai_duyet, bi_khoa FROM users WHERE email = ?")
+  let row = await c.env.DB.prepare("SELECT email, ten, COALESCE(vai_tro, vai_tro_xem) as vai_tro, trang_thai_duyet, bi_khoa FROM users WHERE email = ?")
     .bind(email)
     .first<UserRow>();
 

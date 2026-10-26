@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, ClipboardList, AlertCircle, AlertTriangle, Clock3, CheckCircle2, LifeBuoy } from "lucide-react";
 import { api } from "../api/client";
-import type { KtvOption, ViPham } from "../types";
+import type { ViPham } from "../types";
+import { useKtvOptions } from "../hooks/useKtvOptions";
 import { KtvCombobox } from "../components/KtvCombobox";
 import { loaiLoiLabel } from "../lib/format";
 import { StatusBadge, viPhamStatus } from "../components/StatusBadge";
@@ -68,21 +69,21 @@ function ThongTinNhanh({ thongKe, nhanTong }: { thongKe: ThongKe; nhanTong: stri
   );
 }
 
-// Admin: o chon KTV giong "Bao cao nhanh", mac dinh toan doi. onSelect(id, readOnly): Admin mo vi pham KHONG phai cua
-// minh thi chi xem (backend cung chan nop giai trinh thay KTV).
+// Admin/View/GS: o chon KTV giong "Bao cao nhanh", mac dinh toan doi (GS: toan nhom khu vuc minh). onSelect(id,
+// readOnly): mo vi pham KHONG phai cua minh thi chi xem (backend cung chan nop giai trinh thay KTV).
 // maKtv giu o App.tsx de khong mat lua chon khi mo chi tiet roi quay lai.
 export function ViPhamListScreen({
   onSelect,
-  isAdmin,
+  xemNhieu,
   maKtv,
   setMaKtv,
 }: {
   onSelect: (id: string, readOnly: boolean) => void;
-  isAdmin: boolean;
+  xemNhieu: boolean;
   maKtv: string;
   setMaKtv: (v: string) => void;
 }) {
-  const [ktvOptions, setKtvOptions] = useState<KtvOption[]>([]);
+  const ktv = useKtvOptions(xemNhieu);
   const [trangThai, setTrangThai] = useState("");
   const [rows, setRows] = useState<ViPham[]>([]);
   const [chuaXuLy, setChuaXuLy] = useState(0);
@@ -94,14 +95,9 @@ export function ViPhamListScreen({
   const [error, setError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    api.get<{ rows: KtvOption[] }>("/admin/vi-pham/ktv-options").then((r) => setKtvOptions(r.rows)).catch(() => {});
-  }, [isAdmin]);
-
   function qs(p: number): string {
     const params = new URLSearchParams({ trang_thai: trangThai, page: String(p) });
-    if (isAdmin) {
+    if (xemNhieu) {
       if (maKtv) params.set("ma_ktv", maKtv);
       else params.set("toan_doi", "1");
     }
@@ -129,7 +125,7 @@ export function ViPhamListScreen({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trangThai, maKtv, isAdmin]);
+  }, [trangThai, maKtv, xemNhieu]);
 
   function loadMore() {
     if (loadingMore || !hasMore) return;
@@ -163,10 +159,15 @@ export function ViPhamListScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sentinelRef.current, hasMore, loadingMore, page, trangThai, maKtv]);
 
-  // O chon KTV dat NGOAI vung loading/empty de Admin luon doi duoc KTV, ke ca khi KTV dang chon khong co vi pham nao.
-  const boChonKtv = isAdmin && (
+  // O chon KTV dat NGOAI vung loading/empty de luon doi duoc KTV, ke ca khi KTV dang chon khong co vi pham nao.
+  const boChonKtv = xemNhieu && (
     <div style={{ marginBottom: 12 }}>
-      <KtvCombobox value={maKtv} onChange={setMaKtv} options={ktvOptions} allLabel="Toàn đội" containerStyle={{ maxWidth: 360 }} />
+      <KtvCombobox value={maKtv} onChange={setMaKtv} options={ktv.options} allLabel={ktv.allLabel} containerStyle={{ maxWidth: 360 }} />
+      {ktv.chuaGanKhuVuc && (
+        <div className="alert alert-error" style={{ marginTop: 8 }}>
+          Tài khoản Giám sát chưa được gán khu vực nào - liên hệ Admin để được gán.
+        </div>
+      )}
     </div>
   );
 
@@ -185,7 +186,7 @@ export function ViPhamListScreen({
       </div>
     );
 
-  const xemNguoiKhac = isAdmin;
+  const xemNguoiKhac = xemNhieu;
   const list =
     thongKe.tong === 0 ? (
       <div className="empty-state">{xemNguoiKhac ? "Không có vi phạm nào." : "Bạn chưa có vi phạm nào cần giải trình. 🎉"}</div>
@@ -193,7 +194,7 @@ export function ViPhamListScreen({
       <div>
         <div className="section-title" style={{ marginTop: 0, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <span>
-            {xemNguoiKhac ? (maKtv ? "Vi phạm của KTV" : "Vi phạm toàn đội") : "Vi phạm cần xử lý"} {chuaXuLy > 0 && <span className="badge">{chuaXuLy}</span>}
+            {xemNguoiKhac ? (maKtv ? "Vi phạm của KTV" : ktv.khuVuc ? "Vi phạm toàn nhóm" : "Vi phạm toàn đội") : "Vi phạm cần xử lý"} {chuaXuLy > 0 && <span className="badge">{chuaXuLy}</span>}
           </span>
           <select value={trangThai} onChange={(e) => setTrangThai(e.target.value)} style={{ fontWeight: 400 }}>
             {TRANG_THAI_OPTIONS.map((o) => (
@@ -210,7 +211,7 @@ export function ViPhamListScreen({
             {rows.map((vp) => {
               const status = viPhamStatus(vp);
               return (
-                <div key={vp.id} className={`card card-clickable ${status.cls === "status-overdue" ? "card-priority" : ""}`} onClick={() => onSelect(vp.id, isAdmin && !vp.la_cua_toi)}>
+                <div key={vp.id} className={`card card-clickable ${status.cls === "status-overdue" ? "card-priority" : ""}`} onClick={() => onSelect(vp.id, xemNhieu && !vp.la_cua_toi)}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 11, color: "var(--ink-400)", fontWeight: 700, marginBottom: 2 }}>#{vp.id}</div>
