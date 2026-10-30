@@ -102,7 +102,7 @@ function MainApp() {
       <div className="topbar">
         <div className="topbar-title">
           <img src="/icon-192.png" width={24} height={24} style={{ borderRadius: 6 }} alt="" />
-          Giải trình vi phạm
+          Chỉ số &amp; giải trình
         </div>
         <div className="topbar-tabs">
           <button

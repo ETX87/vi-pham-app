@@ -58,7 +58,7 @@ function MaKtvTuKhaiForm() {
 
 export function LoginScreen({ variant = "login" }: { variant?: "login" | "pending" | "rejected" | "disabled" }) {
   const messages: Record<string, { title: string; sub: string }> = {
-    login: { title: "Giải trình vi phạm", sub: "Hệ thống giải trình vi phạm cho KTV - Dịch Vụ 3T" },
+    login: { title: "Chỉ số & giải trình", sub: "Hệ thống giải trình vi phạm cho KTV - Dịch Vụ 3T" },
     pending: { title: "Đang chờ duyệt", sub: "Tài khoản của bạn đã được ghi nhận, vui lòng chờ Admin phê duyệt." },
     rejected: { title: "Tài khoản bị từ chối", sub: "Liên hệ Admin nếu bạn cho rằng đây là nhầm lẫn." },
     disabled: { title: "Tài khoản đã bị khóa", sub: "Liên hệ Admin để được mở khóa lại." },
@@ -68,7 +68,7 @@ export function LoginScreen({ variant = "login" }: { variant?: "login" | "pendin
   return (
     <div className="login-screen">
       <div className="login-card">
-        <img src="/icon-192.png" alt="Giải trình vi phạm" width={52} height={52} className="login-icon" />
+        <img src="/icon-192.png" alt="Chỉ số & giải trình" width={52} height={52} className="login-icon" />
         <div className="login-title">{title}</div>
         <div className="login-sub">{sub}</div>
         {variant === "login" && (
