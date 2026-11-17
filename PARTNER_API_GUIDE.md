@@ -48,7 +48,7 @@ X-API-Key: <api_key_cua_doi_tac>
 
 | Tham số | Bắt buộc | Mô tả |
 |---|---|---|
-| `id` (query string) | Có | Mã case cần tra cứu (mã ID gốc từ CRM, ví dụ `CASE-2026-00123`). Case-sensitive, so khớp chính xác. |
+| `id` (query string) | Có | Mã case cần tra cứu (mã ID gốc từ CRM, ví dụ `CASE-2026-00123`, hoặc format mới `SC261007210` = SC + năm (2 số) + tháng + ngày + số thứ tự). Case-sensitive, so khớp chính xác — bên nhận coi là chuỗi tùy ý, không ràng buộc format. |
 | Header `X-API-Key` | Có | API key được cấp. Thiếu hoặc sai key → lỗi 401 (xem mục 4). |
 
 Nếu thiếu tham số `id` hoặc `id` rỗng, API trả về **thành công** với `found: false` (không phải lỗi
