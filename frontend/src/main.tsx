@@ -3,11 +3,13 @@ import { createRoot } from "react-dom/client";
 import { AuthProvider } from "./auth/AuthContext";
 import { App } from "./App";
 import "./styles.css";
+import { CuaSoThongTin } from "./components/CuaSoThongTin";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
       <App />
+      <CuaSoThongTin />
     </AuthProvider>
   </StrictMode>,
 );

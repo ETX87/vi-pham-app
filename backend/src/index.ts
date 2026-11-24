@@ -12,6 +12,7 @@ import syncKtvRoutes from "./routes/syncKtv";
 import loaiLoiRoutes from "./routes/loaiLoi";
 import ketQuaCap1Routes from "./routes/ketQuaCap1";
 import { retryPendingGiaiTrinh } from "./lib/dvbhClient";
+import { layCuaSoThongTin } from "./lib/cuaSoThongTin";
 
 // He doc lap "Giai trinh vi pham" - nhan ban kien truc linh-kien-app (xem ke hoach xay dung). Cron
 // DUY NHAT (moi dau gio): retry cac giai trinh chua dong bo duoc ve DVBH. Danh ba KTV KHONG dong bo
@@ -24,6 +25,9 @@ app.use("*", async (c, next) => {
   c.set("requestId", crypto.randomUUID());
   await next();
 });
+
+// Cua so thong tin eOffice (2026-11-24, lib/cuaSoThongTin.ts): khong can dang nhap - hien ca o man dang nhap.
+app.get("/api/cua-so", async (c) => c.json(await layCuaSoThongTin(c.env.CUA_SO_KHOA)));
 
 app.route("/api/auth", authRoutes);
 app.route("/api/nhan-vi-pham", nhanViPhamRoutes);
