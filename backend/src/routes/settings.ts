@@ -4,7 +4,7 @@ import type { Env } from "../types";
 import { verifySessionMiddleware } from "../middleware/session";
 import { loadUser } from "../middleware/loadUser";
 import { requireAdmin } from "../middleware/requireAdmin";
-import { encryptSecret } from "../lib/secretBox";
+import { encryptSecret, decryptSecret } from "../lib/secretBox";
 import { nowVN } from "../lib/vnTime";
 
 // Man Admin toi gian (viec bat buoc phai co theo MVP - xem ke hoach xay dung): ket noi Google Drive
@@ -19,14 +19,18 @@ const GOOGLE_DRIVE_STATE_COOKIE = "vipham_drive_oauth_state";
 const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file openid email profile";
 
 settings.get("/google-drive/status", async (c) => {
-  const row = await c.env.DB.prepare("SELECT google_email, folder_id, authorized_by, authorized_at FROM google_drive_oauth WHERE id = 1").first<{
+  const row = await c.env.DB.prepare("SELECT google_email, folder_id, authorized_by, authorized_at, refresh_token_enc FROM google_drive_oauth WHERE id = 1").first<{
     google_email: string;
     folder_id: string;
     authorized_by: string;
     authorized_at: string;
+    refresh_token_enc: string;
   }>();
   if (!row) return c.json({ connected: false });
-  return c.json({ connected: true, ...row });
+  const { refresh_token_enc, ...info } = row;
+  // Thu giai ma token: hong (vd doi SESSION_SECRET) thi bao "hong" de Admin ket noi lai.
+  const hong = await decryptSecret(c.env, refresh_token_enc).then(() => false, () => true);
+  return c.json({ connected: true, hong, ...info });
 });
 
 settings.get("/google-drive/authorize", async (c) => {

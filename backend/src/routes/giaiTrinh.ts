@@ -443,6 +443,8 @@ giaiTrinh.post("/vi-pham/:id/anh", async (c) => {
     return c.json({ thumbnailUrl });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    // Ghi log de tra duoc nguyen nhan bang "wrangler tail" (truoc day chi tra ve app, khong de lai dau vet).
+    console.error("UPLOAD_ANH_LOI", { viPhamId: id, contentType, bytes: bytes.byteLength, message: message.slice(0, 500) });
     if (message.startsWith("GOOGLE_DRIVE_NOT_CONNECTED")) return c.json({ error: "GOOGLE_DRIVE_NOT_CONNECTED", message }, 409);
     return c.json({ error: "UPLOAD_FAILED", message }, 502);
   }

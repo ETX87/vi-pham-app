@@ -36,7 +36,11 @@ async function getUserAccessToken(env: Env, db: D1Database): Promise<{ accessTok
     .first<{ refresh_token_enc: string; folder_id: string }>();
   if (!row) throw new Error("GOOGLE_DRIVE_NOT_CONNECTED: chua ket noi tai khoan Google Drive - vao Cai dat de ket noi.");
 
-  const refreshToken = await decryptSecret(env, row.refresh_token_enc);
+  // Khoa giai ma suy ra tu SESSION_SECRET (lib/secretBox.ts) - doi secret nay thi token cu khong giai ma
+  // duoc nua (su co 26/11/2026). Bao ro de Admin vao Quan tri -> "Ket noi lai Google Drive".
+  const refreshToken = await decryptSecret(env, row.refresh_token_enc).catch(() => {
+    throw new Error("GOOGLE_DRIVE_NOT_CONNECTED: Kết nối Google Drive đã hỏng (khoá máy chủ đã đổi). Báo Admin vào Quản trị → Kết nối lại Google Drive.");
+  });
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -47,7 +51,12 @@ async function getUserAccessToken(env: Env, db: D1Database): Promise<{ accessTok
       grant_type: "refresh_token",
     }),
   });
-  if (!res.ok) throw new Error(`Google Drive token refresh failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const detail = await res.text();
+    // invalid_grant = token bi thu hoi / het han phia Google -> cung phai ket noi lai.
+    if (detail.includes("invalid_grant")) throw new Error("GOOGLE_DRIVE_NOT_CONNECTED: Google đã thu hồi quyền Drive. Báo Admin vào Quản trị → Kết nối lại Google Drive.");
+    throw new Error(`Google Drive token refresh failed: ${res.status} ${detail}`);
+  }
   const json = (await res.json()) as { access_token: string };
   return { accessToken: json.access_token, folderId: row.folder_id };
 }

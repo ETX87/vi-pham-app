@@ -3,6 +3,16 @@
 > Mỗi đợt làm việc 1 mục, **mới nhất ở trên**: ngày, phiên bản, yêu cầu, đã làm gì, kiểm thử gì, việc còn dở. Chỉ ghi thêm, không xoá mục cũ.
 > Không ghi tài khoản, mật khẩu, khoá hay mô tả lỗ hổng bảo mật vào file này (repo có thể công khai).
 
+## 27/11/2026 — Sửa lỗi KTV không tải được ảnh bằng chứng
+
+**Yêu cầu (nguyên văn):** "các ktv báo lỗi không thể up ảnh lên" (kèm ảnh chụp lỗi "Decryption failed … AES-GCM").
+
+**Nguyên nhân:** 26/11/2026 10:26 (giờ VN) secret của Worker bị thay → khoá giải mã token Google Drive (suy ra từ `SESSION_SECRET`) đổi → token đã lưu không giải mã được, mọi lần tải ảnh đều lỗi. Ảnh tải được lần cuối 25/11 14:52; từ 26/11 tới lúc sửa có 28 giải trình gửi không kèm ảnh. Đồng thời màn Quản trị giấu nút "Kết nối Google Drive" khi đã có kết nối nên Admin không tự kết nối lại được.
+
+**Đã sửa:** `GET /settings/google-drive/status` thử giải mã, trả `hong`; màn Quản trị báo đỏ "Kết nối Google Drive đã HỎNG" và luôn có nút "Kết nối lại Google Drive"; lỗi giải mã / Google thu hồi quyền → KTV thấy câu tiếng Việt "báo Admin kết nối lại" thay cho lỗi kỹ thuật; route tải ảnh ghi log lỗi để tra bằng `wrangler tail`.
+
+**Còn phải làm (người):** Admin đăng nhập → Quản trị → "Kết nối lại Google Drive" bằng tài khoản Google chủ kho ảnh. Sau đó KTV thử lại. 28 giải trình đã gửi không ảnh không tự bổ sung được — KTV cần gửi ảnh cho Giám sát nếu cần.
+
 ## 27/11/2026 — Tài liệu hướng dẫn KTV dạng HTML + tab Hướng dẫn
 
 **Yêu cầu (nguyên văn):** "tạo tài liệu hướng dẫn sử dụng cho KTV chi tiết trên giao diện html rồi đẩy lên tab hướng dẫn cho ktv".

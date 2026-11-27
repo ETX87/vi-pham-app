@@ -13,6 +13,7 @@ import { ViPhamDetailScreen } from "./ViPhamDetailScreen";
 
 interface DriveStatus {
   connected: boolean;
+  hong?: boolean;
   google_email?: string;
   folder_id?: string;
   authorized_by?: string;
@@ -1017,8 +1018,15 @@ export function AdminScreen() {
           <div className="loading-state">Đang tải...</div>
         ) : driveStatus.connected ? (
           <div>
-            <div className="alert alert-success">Đã kết nối: {driveStatus.google_email}</div>
+            {driveStatus.hong ? (
+              <div className="alert alert-error">Kết nối Google Drive đã HỎNG ({driveStatus.google_email}) - KTV không tải được ảnh bằng chứng. Bấm "Kết nối lại Google Drive".</div>
+            ) : (
+              <div className="alert alert-success">Đã kết nối: {driveStatus.google_email}</div>
+            )}
             <div className="card-meta">Kết nối bởi {driveStatus.authorized_by} lúc {driveStatus.authorized_at}</div>
+            <a className={`btn btn-sm ${driveStatus.hong ? "btn-primary" : ""}`} style={{ marginTop: 8 }} href="/api/settings/google-drive/authorize">
+              Kết nối lại Google Drive
+            </a>
           </div>
         ) : (
           <div>
