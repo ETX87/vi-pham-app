@@ -203,7 +203,7 @@ export function ViPhamDetailScreen({ id, onBack, onChanged, readOnly }: { id: st
           <textarea rows={2} value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} />
         </div>
 
-        <button className="btn btn-primary" disabled={submitting || (!noiDung.trim() && photos.length === 0)} onClick={handleSubmit}>
+        <button className="btn btn-primary" disabled={submitting || uploading || (!noiDung.trim() && photos.length === 0)} onClick={handleSubmit}>
           <Send size={16} /> {submitting ? "Đang gửi..." : "Gửi giải trình"}
         </button>
       </div>

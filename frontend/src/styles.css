@@ -474,3 +474,10 @@ select {
   }
   .bottom-tab-label { font-size: 10px; }
 }
+
+/* Tab "Huong dan" - iframe tai lieu /huong-dan-ktv/ (HuongDanScreen.tsx) chiem het chieu cao con lai. */
+.huong-dan-frame { display: block; width: 100%; height: calc(100dvh - 160px); border: 1px solid #e7e2dc; border-radius: 12px; background: #fff; }
+@media (max-width: 767px) {
+  .huong-dan-frame { height: calc(100dvh - 210px - env(safe-area-inset-bottom, 0px)); }
+}
+@media (min-width: 768px) { .huong-dan-screen .detail-back { display: none; } }

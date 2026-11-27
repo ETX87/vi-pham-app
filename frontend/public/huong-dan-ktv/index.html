@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Hướng dẫn sử dụng cho KTV — Chỉ số &amp; giải trình</title>
+<style>
+  :root {
+    --brand: #7f1d1d; --brand-2: #991b1b; --brand-soft: #fdf2f2;
+    --ink: #1f2328; --ink-2: #57606a; --ink-3: #8c959f; --line: #e7e2dc; --bg: #f7f4f1;
+    --amber: #b7791f; --amber-soft: #fdf3dc; --red: #c53030; --red-soft: #fde8e8;
+    --blue: #2563eb; --blue-soft: #e5edff; --green: #2f855a; --green-soft: #e3f4ea;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; font-family: "Segoe UI", Roboto, Arial, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.6; font-size: 15px; }
+  header.hero { background: var(--brand); color: #fff; padding: 22px 18px 20px; }
+  header.hero .kicker { font-size: 12px; opacity: .8; letter-spacing: .04em; text-transform: uppercase; }
+  header.hero h1 { margin: 4px 0 6px; font-size: 22px; line-height: 1.3; }
+  header.hero p { margin: 0; opacity: .9; font-size: 14px; }
+  main { max-width: 760px; margin: 0 auto; padding: 14px 14px 60px; }
+  section { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 6px; margin: 14px 0; }
+  h2 { font-size: 18px; margin: 0 0 10px; color: var(--brand); display: flex; gap: 8px; align-items: baseline; }
+  h2 .num { background: var(--brand); color: #fff; border-radius: 8px; font-size: 13px; padding: 1px 8px; }
+  h3 { font-size: 15.5px; margin: 16px 0 6px; }
+  p, li { margin: 6px 0; }
+  ul, ol { padding-left: 20px; }
+  a { color: var(--brand-2); }
+  .toc { columns: 2; column-gap: 18px; padding-left: 18px; font-size: 14px; }
+  .toc li { break-inside: avoid; }
+  @media (max-width: 520px) { .toc { columns: 1; } }
+  .w5 { width: 100%; border-collapse: collapse; font-size: 14px; margin: 6px 0 12px; }
+  .w5 th, .w5 td { border: 1px solid var(--line); padding: 7px 9px; vertical-align: top; text-align: left; }
+  .w5 th { background: var(--brand-soft); color: var(--brand); white-space: nowrap; width: 92px; }
+  table.tt { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0 12px; }
+  table.tt th, table.tt td { border: 1px solid var(--line); padding: 7px 9px; vertical-align: top; text-align: left; }
+  table.tt thead th { background: #faf7f4; }
+  .badge { display: inline-block; border-radius: 999px; padding: 1px 10px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+  .b-amber { background: var(--amber-soft); color: var(--amber); }
+  .b-red { background: var(--red-soft); color: var(--red); }
+  .b-blue { background: var(--blue-soft); color: var(--blue); }
+  .b-green { background: var(--green-soft); color: var(--green); }
+  .b-grey { background: #eef0f2; color: var(--ink-2); }
+  .note, .warn, .tip { border-radius: 10px; padding: 10px 12px; margin: 10px 0; font-size: 14px; }
+  .note { background: var(--blue-soft); }
+  .warn { background: var(--red-soft); }
+  .tip { background: var(--green-soft); }
+  .shots { display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0 14px; }
+  figure { margin: 0; flex: 1 1 200px; max-width: 260px; }
+  figure img { width: 100%; border-radius: 12px; border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.06); cursor: zoom-in; display: block; }
+  figcaption { font-size: 12.5px; color: var(--ink-2); margin-top: 6px; text-align: center; }
+  /* Luong quy trinh ngang */
+  .flow { display: flex; align-items: flex-start; margin: 14px 0 6px; position: relative; }
+  .flow::before { content: ""; position: absolute; left: 10%; right: 10%; top: 13px; height: 3px; background: var(--line); }
+  .step { flex: 1; text-align: center; position: relative; font-size: 12.5px; color: var(--ink-2); }
+  .dot { width: 28px; height: 28px; border-radius: 50%; margin: 0 auto 6px; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #fff; position: relative; z-index: 1; }
+  .step b { display: block; color: var(--ink); font-size: 13px; }
+  .steps-ol { counter-reset: s; list-style: none; padding: 0; }
+  .steps-ol > li { counter-increment: s; position: relative; padding-left: 36px; margin: 10px 0; }
+  .steps-ol > li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+  details { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 8px 0; background: #fffdfb; }
+  details summary { cursor: pointer; font-weight: 600; }
+  .kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; background: #fff; font-size: 13px; white-space: nowrap; }
+  footer { text-align: center; color: var(--ink-3); font-size: 12.5px; margin-top: 18px; }
+  #lb { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+  #lb img { max-width: 100%; max-height: 100%; border-radius: 10px; }
+  #lb.on { display: flex; }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="kicker">Dịch Vụ 3T · App Chỉ số &amp; giải trình</div>
+  <h1>Hướng dẫn sử dụng dành cho Kỹ thuật viên (KTV)</h1>
+  <p>Xem vi phạm của mình · nộp giải trình kèm ảnh bằng chứng · theo dõi kết quả QC và chỉ số tháng.</p>
+</header>
+
+<main>
+<section>
+  <h2>Mục lục</h2>
+  <ol class="toc">
+    <li><a href="#tong-quan">Tổng quan (5W1H)</a></li>
+    <li><a href="#dang-nhap">Đăng nhập &amp; cài đặt</a></li>
+    <li><a href="#quy-trinh">Quy trình 1 vi phạm</a></li>
+    <li><a href="#danh-sach">Danh sách vi phạm</a></li>
+    <li><a href="#chi-tiet">Xem chi tiết vi phạm</a></li>
+    <li><a href="#giai-trinh">Nộp giải trình + ảnh</a></li>
+    <li><a href="#sau-khi-nop">Sau khi nộp</a></li>
+    <li><a href="#bao-cao">Báo cáo nhanh</a></li>
+    <li><a href="#thong-bao">Thông báo</a></li>
+    <li><a href="#tai-khoan">Tài khoản</a></li>
+    <li><a href="#hoi-dap">Câu hỏi thường gặp</a></li>
+    <li><a href="#lien-he">Liên hệ hỗ trợ</a></li>
+  </ol>
+</section>
+
+<section id="tong-quan">
+  <h2><span class="num">1</span> Tổng quan (5W1H)</h2>
+  <table class="w5">
+    <tr><th>Who · Ai</th><td><b>KTV / CTV</b> là người dùng chính: xem và giải trình vi phạm của chính mình. <b>Giám sát, QC, Admin</b> xem giải trình của KTV và chốt lỗi.</td></tr>
+    <tr><th>When · Khi nào</th><td>Mỗi khi hệ thống DVBH ghi nhận 1 vi phạm cho ca của bạn (bạn nhận thông báo). Nên giải trình <b>trong 48 giờ</b> kể từ lúc ghi nhận.</td></tr>
+    <tr><th>Where · Ở đâu</th><td>Trên điện thoại: mở app từ biểu tượng trên màn hình chính hoặc từ Cổng ứng dụng 3T, hoặc vào thẳng <b>vipham.dichvu3t.workers.dev</b>. Máy tính dùng được, cùng tài khoản.</td></tr>
+    <tr><th>What · Làm gì</th><td>Xem danh sách vi phạm, đọc giải thích loại lỗi, xem case gốc, <b>nộp giải trình (lý do + tối đa 5 ảnh bằng chứng)</b>, theo dõi kết quả QC và chỉ số tháng.</td></tr>
+    <tr><th>Why · Vì sao</th><td>Giải trình rõ ràng, có ảnh là căn cứ để QC <b>bỏ lỗi</b> khi lỗi không do bạn. Không giải trình thì vi phạm dễ bị chốt và tính vào chỉ số của bạn.</td></tr>
+    <tr><th>How · Cách làm</th><td>Tab <b>Vi phạm</b> → bấm vào vi phạm → <b>Tạo giải trình</b> → nhập lý do → đính kèm ảnh → <b>Gửi giải trình</b>. Chi tiết ở mục 6.</td></tr>
+  </table>
+  <p>Thanh dưới cùng của app có 4 tab: <b>Vi phạm</b> · <b>Báo cáo</b> · <b>Thông báo</b> · <b>Tài khoản</b>. Số đỏ trên tab = số việc cần xử lý / thông báo chưa đọc.</p>
+</section>
+
+<section id="dang-nhap">
+  <h2><span class="num">2</span> Đăng nhập &amp; cài đặt lần đầu</h2>
+  <ol class="steps-ol">
+    <li>Mở app, bấm <b>Đăng nhập bằng Google</b>, chọn đúng Gmail đã khai với công ty.</li>
+    <li>Lần đầu, tài khoản ở trạng thái <b>Đang chờ duyệt</b> — báo Admin / Giám sát để được duyệt. Được duyệt rồi thì lần sau vào thẳng app.</li>
+    <li><b>Thêm app vào màn hình chính</b> (tab Tài khoản → "Thêm vào màn hình chính"):
+      <ul>
+        <li>Android: bấm "Cài đặt" / "Thêm" khi hộp thoại hiện ra (hoặc menu ⋮ của Chrome → "Thêm vào Màn hình chính").</li>
+        <li>iPhone (Safari): nút Chia sẻ (ô vuông có mũi tên) → "Thêm vào MH chính" → "Thêm".</li>
+      </ul>
+      Từ đó luôn mở app bằng biểu tượng vừa tạo.</li>
+    <li><b>Bật thông báo đẩy</b>: tab Tài khoản → "Cài đặt thông báo đẩy" → cho phép khi điện thoại hỏi. Nhãn chuyển từ <span class="badge b-red">Chưa bật</span> sang <span class="badge b-green">Đã bật</span>.</li>
+  </ol>
+  <div class="warn">Không bật thông báo thì app vẫn dùng được, nhưng bạn <b>sẽ không được báo ngay</b> khi có vi phạm mới → dễ quá hạn 48 giờ.</div>
+</section>
+
+<section id="quy-trinh">
+  <h2><span class="num">3</span> Quy trình 1 vi phạm</h2>
+  <div class="flow">
+    <div class="step"><div class="dot" style="background:var(--ink-3)">1</div><b>Ghi nhận</b>DVBH phát hiện lỗi trên ca</div>
+    <div class="step"><div class="dot" style="background:var(--amber)">2</div><b>Chưa giải trình</b>Bạn có 48 giờ</div>
+    <div class="step"><div class="dot" style="background:var(--blue)">3</div><b>Chờ chốt lỗi</b>Bạn đã nộp, QC đang xem</div>
+    <div class="step"><div class="dot" style="background:var(--green)">4</div><b>Đã chốt lỗi</b>QC xác nhận hoặc bỏ lỗi</div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-2)">Quá 48 giờ mà chưa nộp: bước 2 chuyển thành <span class="badge b-red">Quá hạn giải trình</span> — vẫn nộp được, nhưng nên nộp ngay.</p>
+  <table class="tt">
+    <thead><tr><th>Trạng thái</th><th>Nghĩa là</th><th>Bạn cần làm</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge b-amber">Chưa giải trình</span></td><td>Vi phạm mới, còn trong 48 giờ kể từ lúc ghi nhận.</td><td>Mở và nộp giải trình càng sớm càng tốt.</td></tr>
+      <tr><td><span class="badge b-red">Quá hạn giải trình</span></td><td>Đã quá 48 giờ, chưa nộp. Thẻ có nền hồng.</td><td>Vẫn nộp bình thường (app không chặn), nhưng làm ngay.</td></tr>
+      <tr><td><span class="badge b-blue">Chờ chốt lỗi</span></td><td>Đã nộp giải trình, QC chưa quyết định.</td><td>Không cần làm gì, chờ thông báo kết quả.</td></tr>
+      <tr><td><span class="badge b-green">Đã chốt lỗi</span></td><td>QC đã quyết định: <b>xác nhận vi phạm</b> hoặc <b>bỏ (không tính)</b>.</td><td>Xem kết quả trong chi tiết. Không thao tác thêm.</td></tr>
+      <tr><td><span class="badge b-grey">Đang chờ đồng bộ</span></td><td>Nhãn phụ: giải trình đã lưu nhưng chưa gửi xong sang DVBH.</td><td>Không cần nộp lại — hệ thống tự gửi lại mỗi giờ.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="danh-sach">
+  <h2><span class="num">4</span> Danh sách "Vi phạm cần xử lý"</h2>
+  <div class="shots">
+    <figure><img src="img/01-danh-sach.jpg" alt="Danh sách vi phạm" loading="lazy" /><figcaption>Hình 1 — Tab Vi phạm</figcaption></figure>
+  </div>
+  <ul>
+    <li>Mới nhất ở trên. Số đỏ cạnh tiêu đề = số vi phạm còn cần xử lý.</li>
+    <li>Mỗi thẻ: <b>mã vi phạm</b> (#L-…), <b>mã case</b> (chữ đỏ đậm, dùng để đối chiếu với CSKH/DVBH), loại lỗi, ngày giờ ghi nhận, chi nhánh, tên khách hàng, trạng thái ở góc phải.</li>
+    <li>Dòng nhỏ dưới thẻ (vd <span class="badge b-red">QC xác nhận vi phạm</span>) cho biết kết quả QC khi đã chốt.</li>
+    <li>Ô <b>"Tất cả trạng thái"</b> ở góc phải để lọc nhanh: Chưa giải trình / Quá hạn / Chờ chốt lỗi / Đã chốt lỗi.</li>
+    <li>Kéo xuống cuối danh sách để tải thêm.</li>
+  </ul>
+</section>
+
+<section id="chi-tiet">
+  <h2><span class="num">5</span> Xem chi tiết vi phạm</h2>
+  <div class="shots">
+    <figure><img src="img/02-chi-tiet.jpg" alt="Chi tiết vi phạm" loading="lazy" /><figcaption>Hình 2 — Chi tiết vi phạm</figcaption></figure>
+    <figure><img src="img/03-giai-thich-loi.jpg" alt="Giải thích loại lỗi" loading="lazy" /><figcaption>Hình 3 — Bấm dấu ? để đọc giải thích loại lỗi</figcaption></figure>
+  </div>
+  <ul>
+    <li>Bấm vào 1 thẻ để mở chi tiết: thời gian, khu vực, kết luận của CSKH (nếu có), người ghi nhận, khách hàng, seri sản phẩm, mã case.</li>
+    <li>Bấm <b>dấu ?</b> cạnh tên lỗi / kết luận CSKH để đọc <b>lỗi này nghĩa là gì</b> — đọc kỹ trước khi giải trình để trả lời đúng trọng tâm.</li>
+    <li>Bấm <b>mã case</b> (gạch chân) để xem thông tin case gốc bên DVBH (lịch hẹn, báo cáo công việc, ảnh đã chụp…).</li>
+    <li>Nút <b>Tạo giải trình</b> nằm ngay dưới thông tin vi phạm.</li>
+  </ul>
+</section>
+
+<section id="giai-trinh">
+  <h2><span class="num">6</span> Nộp giải trình kèm ảnh bằng chứng</h2>
+  <table class="w5">
+    <tr><th>Who</th><td>Chỉ KTV <b>được gán</b> vi phạm đó. Giám sát / Admin chỉ xem, không nộp thay trên app.</td></tr>
+    <tr><th>When</th><td>Khi vi phạm ở trạng thái Chưa giải trình hoặc Quá hạn giải trình. <b>Mỗi vi phạm nộp 1 lần.</b></td></tr>
+    <tr><th>Where</th><td>Chi tiết vi phạm → nút <b>Tạo giải trình</b> → màn "Tạo giải trình".</td></tr>
+    <tr><th>What</th><td>Lý do (tối đa 1000 ký tự) + <b>tối đa 5 ảnh bằng chứng, mỗi ảnh ≤ 10 MB</b> + ghi chú (không bắt buộc). Gửi xong tự chuyển sang DVBH cho QC xem.</td></tr>
+    <tr><th>Why</th><td>Ảnh chụp tin nhắn khách, phiếu hẹn, ảnh tại nhà khách… là bằng chứng để QC bỏ lỗi khi lỗi không do bạn.</td></tr>
+  </table>
+
+  <div class="shots">
+    <figure><img src="img/04-tao-giai-trinh.jpg" alt="Màn Tạo giải trình" loading="lazy" /><figcaption>Hình 4 — Màn "Tạo giải trình"</figcaption></figure>
+  </div>
+
+  <h3>Các bước (How)</h3>
+  <ol class="steps-ol">
+    <li>Ở chi tiết vi phạm, bấm <b>Tạo giải trình</b>.</li>
+    <li><b>Lý do giải trình</b>: viết rõ chuyện gì đã xảy ra, vì sao, đã làm gì (vd "Khách đổi giờ hẹn sang chiều, đã báo CSKH lúc 9:10"). Bộ đếm hiện số ký tự / 1000.</li>
+    <li><b>Đính kèm ảnh</b>: bấm ô <b>"Nhấn để chọn ảnh"</b>
+      <ul>
+        <li>Điện thoại: chọn <b>chụp ảnh mới</b> hoặc chọn ảnh có sẵn trong thư viện (chọn được <b>nhiều ảnh cùng lúc</b>).</li>
+        <li>Máy tính: chọn file hoặc <b>kéo thả</b> ảnh vào ô.</li>
+        <li>Chờ chữ "Đang tải lên…" xong, ảnh hiện thành ô nhỏ bên dưới. Bộ đếm hiện <b>x/5</b>.</li>
+        <li>Chọn nhầm: bấm <span class="kbd">✕</span> trên góc ảnh để bỏ, rồi chọn lại.</li>
+        <li>Đủ 5 ảnh thì ô chọn ảnh tự ẩn.</li>
+      </ul>
+    </li>
+    <li><b>Ghi chú thêm</b> nếu cần (không bắt buộc).</li>
+    <li>Bấm <b>Gửi giải trình</b>. Nút chỉ bấm được khi đã có lý do hoặc ít nhất 1 ảnh, và <b>đã tải xong ảnh</b>.</li>
+  </ol>
+
+  <div class="tip"><b>Ảnh nên chụp:</b> tin nhắn / cuộc gọi với khách (chụp màn hình có giờ), phiếu hẹn, ảnh sản phẩm tại nhà khách, ảnh có seri, biên bản… Ảnh rõ nét, thấy được giờ / ngày càng tốt.</div>
+
+  <h3>Thông báo lỗi có thể gặp</h3>
+  <table class="tt">
+    <thead><tr><th>App báo</th><th>Nguyên nhân</th><th>Cách xử lý</th></tr></thead>
+    <tbody>
+      <tr><td>"Chỉ được đính kèm tối đa 5 ảnh - đã bỏ N ảnh thừa."</td><td>Chọn nhiều hơn số ảnh còn được thêm.</td><td>App giữ các ảnh đầu tiên. Muốn đổi ảnh khác: bấm ✕ bỏ bớt rồi chọn lại.</td></tr>
+      <tr><td>"N ảnh vượt 10 MB nên không tải lên."</td><td>Ảnh quá nặng (thường là ảnh gốc độ phân giải rất cao).</td><td>Chụp lại với chất lượng thường, hoặc chụp màn hình ảnh đó rồi gửi.</td></tr>
+      <tr><td>"Chỉ được tải lên file ảnh."</td><td>Chọn nhầm video / PDF / file khác.</td><td>Chỉ chọn ảnh (jpg, png, heic…).</td></tr>
+      <tr><td>"Tải ảnh thất bại." / lỗi Google Drive</td><td>Mạng yếu hoặc kho ảnh của công ty đang trục trặc.</td><td>Thử lại sau ít phút; vẫn lỗi thì báo Admin. Có thể gửi lý do trước nếu sắp quá hạn.</td></tr>
+      <tr><td>"Không thể lưu giải trình - vui lòng thử lại."</td><td>Mất mạng lúc bấm gửi.</td><td>Kiểm tra mạng rồi bấm Gửi lại — nội dung đã nhập vẫn còn.</td></tr>
+    </tbody>
+  </table>
+  <div class="warn">Đã gửi thì <b>không sửa / nộp lại được trên app</b>. Cần bổ sung → liên hệ Giám sát hoặc Admin.</div>
+</section>
+
+<section id="sau-khi-nop">
+  <h2><span class="num">7</span> Sau khi nộp — xem lại &amp; kết quả QC</h2>
+  <div class="shots">
+    <figure><img src="img/06-giai-trinh-da-nop.jpg" alt="Giải trình đã nộp" loading="lazy" /><figcaption>Hình 5 — Mục "Giải trình đã nộp" kèm ảnh</figcaption></figure>
+    <figure><img src="img/05-ket-qua-qc.jpg" alt="Kết quả QC" loading="lazy" /><figcaption>Hình 6 — Kết quả QC ở đầu trang khi đã chốt</figcaption></figure>
+  </div>
+  <ul>
+    <li>Ngay sau khi gửi, app báo <b>"Đã lưu và gửi kết quả về DVBH thành công"</b>, hoặc <b>"Đã lưu giải trình - đang chờ đồng bộ…"</b> nếu DVBH chưa nhận ngay (hệ thống tự gửi lại, <b>không cần nộp lại</b>).</li>
+    <li>Trong chi tiết vi phạm, mục <b>Giải trình đã nộp</b> hiện ngày nộp, nội dung, ghi chú, các ảnh (bấm ảnh để xem to) và nhãn <span class="badge b-green">Đã đồng bộ về DVBH</span> / <span class="badge b-grey">Đang chờ đồng bộ</span>.</li>
+    <li>Nhãn <b>"Giám sát nhập thay (trên DVBH)"</b>: Giám sát đã nhập giải trình giúp bạn bên DVBH.</li>
+    <li>Khi QC chốt, đầu trang chi tiết hiện dải kết quả: <b>QC đã XÁC NHẬN là vi phạm</b> hoặc <b>QC đã BỎ (không tính vi phạm)</b>, kèm người chốt và thời gian. Bạn cũng nhận thông báo.</li>
+  </ul>
+</section>
+
+<section id="bao-cao">
+  <h2><span class="num">8</span> Báo cáo nhanh (chỉ số tháng của bạn)</h2>
+  <div class="shots">
+    <figure><img src="img/07-bao-cao-1.jpg" alt="Báo cáo nhanh" loading="lazy" /><figcaption>Hình 7 — Báo cáo nhanh (phần đầu)</figcaption></figure>
+    <figure><img src="img/08-bao-cao-2.jpg" alt="Báo cáo nhanh tiếp" loading="lazy" /><figcaption>Hình 8 — Tỷ lệ theo loại lỗi</figcaption></figure>
+  </div>
+  <ul>
+    <li>Chọn tháng ở góc phải (mặc định tháng hiện tại).</li>
+    <li><b>Công việc</b>: số ca tiếp nhận, hoàn thành, đúng hạn… lấy từ DVBH (máy thử nghiệm trong ảnh chưa nối DVBH nên trống; trên app thật có số).</li>
+    <li><b>Tổng quan tháng</b>: số vi phạm đang chờ xử lý / quá hạn / đã chốt lỗi / đã bỏ lỗi.</li>
+    <li><b>Giải trình</b>: đã / chưa giải trình, số giải trình trong 48 giờ và tỷ lệ — mục tiêu là 100%.</li>
+    <li><b>Tỷ lệ nghi ngờ theo loại</b>, <b>theo kết luận của CSKH</b>, <b>tỷ lệ lỗi đã chốt theo loại</b>: cho biết bạn hay bị loại lỗi nào để rút kinh nghiệm.</li>
+  </ul>
+</section>
+
+<section id="thong-bao">
+  <h2><span class="num">9</span> Thông báo</h2>
+  <div class="shots">
+    <figure><img src="img/09-thong-bao.jpg" alt="Thông báo" loading="lazy" /><figcaption>Hình 9 — Tab Thông báo</figcaption></figure>
+  </div>
+  <ul>
+    <li>Hai nhóm: <b>Vi phạm</b> (vi phạm mới cần giải trình, QC đã chốt, Giám sát nhập thay…) và <b>Công ty</b> (thông báo chung của công ty).</li>
+    <li>Lọc <b>Tất cả / Chưa đọc / Đã đọc</b>. Mặc định mở "Chưa đọc".</li>
+    <li>Bấm 1 thông báo vi phạm → đánh dấu đã đọc và <b>mở thẳng vi phạm đó</b>.</li>
+    <li><b>Đánh dấu tất cả đã đọc</b> để xoá hết số đỏ 1 lần.</li>
+  </ul>
+</section>
+
+<section id="tai-khoan">
+  <h2><span class="num">10</span> Tài khoản</h2>
+  <div class="shots">
+    <figure><img src="img/10-tai-khoan.jpg" alt="Tài khoản" loading="lazy" /><figcaption>Hình 10 — Tab Tài khoản</figcaption></figure>
+  </div>
+  <ul>
+    <li><b>Cài đặt thông báo đẩy</b>: bật / tắt thông báo trên máy này.</li>
+    <li><b>Thêm vào màn hình chính</b> (chỉ hiện khi chưa thêm).</li>
+    <li><b>Hướng dẫn sử dụng</b>: mở tài liệu này.</li>
+    <li><b>Liên hệ Admin</b>, <b>Đăng xuất</b>.</li>
+  </ul>
+</section>
+
+<section id="hoi-dap">
+  <h2><span class="num">11</span> Câu hỏi thường gặp</h2>
+  <details><summary>Vi phạm trên DVBH có, nhưng app không hiện?</summary>
+    <p>App khớp vi phạm với bạn theo <b>mã KTV</b>. Nếu danh bạ KTV chưa có bạn hoặc sai mã, vi phạm sẽ nằm ở hàng chờ của Admin. Hệ thống tự gán lại mỗi giờ; quá vài giờ vẫn chưa thấy thì báo Admin kèm mã case.</p></details>
+  <details><summary>Quá 48 giờ rồi có nộp được không?</summary>
+    <p>Được. App không chặn, chỉ hiện "Quá hạn giải trình" và tính vào tỷ lệ giải trình trong 48 giờ của bạn.</p></details>
+  <details><summary>Muốn gửi hơn 5 ảnh?</summary>
+    <p>Tối đa 5 ảnh / giải trình. Chọn 5 ảnh rõ nhất; có thể ghép nhiều ảnh thành 1 (ảnh ghép / chụp màn hình) trước khi gửi.</p></details>
+  <details><summary>Gửi nhầm nội dung / quên ảnh?</summary>
+    <p>App không cho sửa sau khi gửi. Liên hệ Giám sát hoặc Admin để được bổ sung.</p></details>
+  <details><summary>Đã bật thông báo mà không nhận được?</summary>
+    <p>Kiểm tra: (1) đang mở app từ biểu tượng ở màn hình chính, (2) điện thoại không tắt quyền thông báo của app, (3) đã có sự kiện mới chưa (vi phạm mới, QC chốt…). iPhone cần iOS 16.4 trở lên.</p></details>
+  <details><summary>Biểu tượng app không hiện số?</summary>
+    <p>Tuỳ dòng máy — có máy chỉ hiện chấm đỏ. Số trong app (trên các tab) luôn chính xác.</p></details>
+</section>
+
+<section id="lien-he">
+  <h2><span class="num">12</span> Liên hệ hỗ trợ</h2>
+  <p>Gặp lỗi hoặc cần sửa giải trình: tab <b>Tài khoản → Liên hệ Admin</b>, hoặc báo trực tiếp Giám sát quản lý bạn qua kênh nội bộ công ty. Khi báo, gửi kèm <b>mã vi phạm (#L-…) và mã case</b>.</p>
+</section>
+
+<footer>Cập nhật 27/11/2026 · Ảnh minh hoạ chụp từ app, dữ liệu mẫu.</footer>
+</main>
+
+<div id="lb" role="dialog" aria-label="Xem ảnh"><img alt="" /></div>
+<script>
+  // Bam anh de xem to, bam bat ky dau de dong.
+  var lb = document.getElementById("lb"), lbImg = lb.querySelector("img");
+  document.querySelectorAll("figure img").forEach(function (img) {
+    img.addEventListener("click", function () { lbImg.src = img.src; lb.classList.add("on"); });
+  });
+  lb.addEventListener("click", function () { lb.classList.remove("on"); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") lb.classList.remove("on"); });
+</script>
+</body>
+</html>

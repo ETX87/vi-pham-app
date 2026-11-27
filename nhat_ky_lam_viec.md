@@ -3,6 +3,19 @@
 > Mỗi đợt làm việc 1 mục, **mới nhất ở trên**: ngày, phiên bản, yêu cầu, đã làm gì, kiểm thử gì, việc còn dở. Chỉ ghi thêm, không xoá mục cũ.
 > Không ghi tài khoản, mật khẩu, khoá hay mô tả lỗ hổng bảo mật vào file này (repo có thể công khai).
 
+## 27/11/2026 — Tài liệu hướng dẫn KTV dạng HTML + tab Hướng dẫn
+
+**Yêu cầu (nguyên văn):** "tạo tài liệu hướng dẫn sử dụng cho KTV chi tiết trên giao diện html rồi đẩy lên tab hướng dẫn cho ktv".
+
+**Đã làm:**
+- `frontend/public/huong-dan-ktv/index.html` + 10 ảnh `img/` chụp từ app chạy máy (vai KTV, dữ liệu mẫu, email trên ảnh là email mẫu). Nội dung theo 5W1H: đăng nhập & cài đặt, luồng 1 vi phạm (luồng ngang), trạng thái, chi tiết, nộp giải trình + ảnh (bước, lỗi thường gặp), sau khi nộp / kết quả QC, báo cáo nhanh, thông báo, tài khoản, hỏi đáp, liên hệ. Bấm ảnh xem to.
+- `HuongDanScreen.tsx`: nhúng trang trên (iframe). Desktop: tab "Hướng dẫn" trên topbar; điện thoại: Tài khoản → "Hướng dẫn sử dụng" (thay hộp 4 dòng cũ), có nút "Mở trang riêng".
+- Sửa thêm: nút "Gửi giải trình" khoá trong lúc ảnh đang tải (trước đây bấm gửi được → ảnh chưa tải xong bị mất khỏi giải trình).
+
+**Kiểm thử:** build + typecheck 0 lỗi; xem trên dev (khổ điện thoại và máy tính): tab mở đúng trang, 10 ảnh tải đủ.
+
+**Ghi chú:** file Word cũ `Huong_dan_su_dung_app_vipham_KTV.docx` (chưa commit, ảnh tháng 9) không dùng nữa — giữ nguyên, không đụng.
+
 ## 27/11/2026 — Rà soát đính kèm ảnh bằng chứng khi KTV giải trình (tối đa 5 ảnh)
 
 **Yêu cầu (nguyên văn):** "kiểm tra lại phân giải trình của ktv đã cho up ảnh bằng chứng, tối đa 5 ảnh".

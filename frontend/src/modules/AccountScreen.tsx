@@ -8,8 +8,7 @@ import { Modal } from "../components/Modal";
 
 // Man "Tai khoan" - chi hien tren mobile (bottom nav, xem layout/BottomTabBar.tsx). Tren desktop cac
 // dieu khien nay da nam san trong .topbar-user (luon hien, khong can 1 man rieng).
-export function AccountScreen({ user, push }: { user: AppUser; push: ReturnType<typeof usePushNotifications> }) {
-  const [showGuide, setShowGuide] = useState(false);
+export function AccountScreen({ user, push, onOpenGuide }: { user: AppUser; push: ReturnType<typeof usePushNotifications>; onOpenGuide: () => void }) {
   const [showContact, setShowContact] = useState(false);
   const [showInstallGuide, setShowInstallGuide] = useState(false);
   const install = usePwaInstall();
@@ -61,7 +60,7 @@ export function AccountScreen({ user, push }: { user: AppUser; push: ReturnType<
             </span>
           </button>
         )}
-        <button className="list-row" onClick={() => setShowGuide(true)}>
+        <button className="list-row" onClick={onOpenGuide}>
           <span className="list-row-icon">
             <HelpCircle size={18} />
           </span>
@@ -110,19 +109,6 @@ export function AccountScreen({ user, push }: { user: AppUser; push: ReturnType<
               Sau khi thêm, mở app từ icon trên màn hình chính (không phải qua trình duyệt) để nhận
               thông báo và số chưa đọc đầy đủ.
             </div>
-          </div>
-        </Modal>
-      )}
-      {showGuide && (
-        <Modal onClose={() => setShowGuide(false)}>
-          <div className="card">
-            <div className="card-title">Hướng dẫn sử dụng</div>
-            <ul style={{ fontSize: 14, lineHeight: 1.7, paddingLeft: 18, margin: "10px 0 0" }}>
-              <li>Tab "Vi phạm" hiển thị các vi phạm bạn cần giải trình, mới nhất trước.</li>
-              <li>Bấm vào 1 vi phạm để xem chi tiết case và bấm "Tạo giải trình".</li>
-              <li>Điền lý do, đính kèm tối đa 5 ảnh bằng chứng rồi bấm "Gửi giải trình".</li>
-              <li>Bật "Thông báo đẩy" để nhận cảnh báo ngay khi có vi phạm mới.</li>
-            </ul>
           </div>
         </Modal>
       )}

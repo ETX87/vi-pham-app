@@ -9,6 +9,7 @@ import { ViPhamDetailScreen } from "./modules/ViPhamDetailScreen";
 import { NotificationsScreen } from "./modules/NotificationsScreen";
 import { AdminScreen } from "./modules/AdminScreen";
 import { AccountScreen } from "./modules/AccountScreen";
+import { HuongDanScreen } from "./modules/HuongDanScreen";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { BottomTabBar, type MobileTab } from "./layout/BottomTabBar";
 import { api } from "./api/client";
@@ -120,6 +121,9 @@ function MainApp() {
           <button className={`topbar-tab ${tab === "thong-bao" ? "active" : ""}`} onClick={() => setTab("thong-bao")}>
             Thông báo {thongBaoBadge > 0 && <span className="badge">{thongBaoBadge}</span>}
           </button>
+          <button className={`topbar-tab ${tab === "huong-dan" ? "active" : ""}`} onClick={() => setTab("huong-dan")}>
+            Hướng dẫn
+          </button>
           {isAdmin && (
             <button className={`topbar-tab ${tab === "admin" ? "active" : ""}`} onClick={() => setTab("admin")}>
               Quản trị
@@ -158,7 +162,10 @@ function MainApp() {
         ) : tab === "thong-bao" ? (
           <NotificationsScreen onSelectViPham={goToViPham} onChanged={refreshBadges} />
         ) : tab === "tai-khoan" ? (
-          <AccountScreen user={user} push={push} />
+          <AccountScreen user={user} push={push} onOpenGuide={() => setTab("huong-dan")} />
+        ) : tab === "huong-dan" ? (
+          // Mobile vao tu Tai khoan -> nut back quay ve Tai khoan; desktop co san tab tren topbar.
+          <HuongDanScreen onBack={() => setTab("tai-khoan")} />
         ) : selectedId ? (
           <ViPhamDetailScreen id={selectedId} onBack={() => setSelectedId(null)} onChanged={refreshBadges} readOnly={selectedReadOnly} />
         ) : (
@@ -174,7 +181,7 @@ function MainApp() {
         )}
       </div>
       <BottomTabBar
-        tab={tab === "vi-pham" && selectedId ? "vi-pham" : tab}
+        tab={tab === "huong-dan" ? "tai-khoan" : tab}
         onChange={(t) => {
           setTab(t);
           if (t === "vi-pham") setSelectedId(null);

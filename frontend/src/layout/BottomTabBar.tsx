@@ -1,6 +1,6 @@
 import { ClipboardList, Bell, Settings, User, BarChart3 } from "lucide-react";
 
-export type MobileTab = "vi-pham" | "bao-cao" | "thong-bao" | "admin" | "tai-khoan";
+export type MobileTab = "vi-pham" | "bao-cao" | "thong-bao" | "admin" | "tai-khoan" | "huong-dan";
 
 interface TabDef {
   key: MobileTab;
