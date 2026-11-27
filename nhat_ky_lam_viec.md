@@ -3,6 +3,16 @@
 > Mỗi đợt làm việc 1 mục, **mới nhất ở trên**: ngày, phiên bản, yêu cầu, đã làm gì, kiểm thử gì, việc còn dở. Chỉ ghi thêm, không xoá mục cũ.
 > Không ghi tài khoản, mật khẩu, khoá hay mô tả lỗ hổng bảo mật vào file này (repo có thể công khai).
 
+## 27/11/2026 — Rà soát đính kèm ảnh bằng chứng khi KTV giải trình (tối đa 5 ảnh)
+
+**Yêu cầu (nguyên văn):** "kiểm tra lại phân giải trình của ktv đã cho up ảnh bằng chứng, tối đa 5 ảnh".
+
+**Hiện trạng:** đã có sẵn — màn "Tạo giải trình" cho chọn / chụp / kéo-thả ảnh, tải lên Drive, giới hạn 5 ảnh ở app, Worker (`POST /giai-trinh`) và khi gửi DVBH.
+
+**Đã vá:** (1) kéo-thả thêm ảnh trong lúc đang tải có thể vượt 5 ảnh (ảnh thứ 6+ bị cắt âm thầm khi nộp) → chặn tải chồng; (2) chọn quá số ảnh còn lại thì báo rõ số ảnh bị bỏ; (3) giới hạn 10 MB/ảnh + Worker `POST /vi-pham/:id/anh` chỉ nhận `image/*` (415) và ≤ 10 MB (413); nhãn ô đính kèm ghi rõ giới hạn.
+
+**Kiểm thử:** build frontend + typecheck backend 0 lỗi.
+
 ## 27/11/2026 — Khớp KTV theo mã KTV (sửa lỗi vi phạm không tới tay KTV)
 
 **Yêu cầu (nguyên văn):** "trên dvbh có nhiều ca cần ktv giải trình nhưng trên app ktv lại không hiện ca cần giải trình là sao" → "gắn lại rồi sửa logic để bắt theo id ktv".

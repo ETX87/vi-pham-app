@@ -24,7 +24,7 @@ quản lý (Admin, GS khu vực, View) theo dõi tình trạng giải trình và
 | F1 | Đăng nhập Google | Tất cả | 4 trạng thái: đăng nhập / chờ duyệt / bị từ chối / bị khoá. KTV khớp danh bạ tự vào được. |
 | F2 | Danh sách "Vi phạm của tôi" | KTV (GS/View/Admin theo phạm vi) | Lọc theo trạng thái (chưa giải trình, chờ chốt lỗi…), hiện loại lỗi, ngày ghi nhận, trạng thái QC. |
 | F3 | Chi tiết vi phạm | Như F2 | Banner kết quả QC (nếu đã chốt); thông tin cơ bản; mã case bấm mở popup "Thông tin case (DVBH)" (tự lấy, có nút đồng bộ, giới hạn tần suất); ảnh báo cáo công việc; lịch sử giải trình chậm trễ của case. |
-| F4 | Nộp giải trình | KTV | Lý do bắt buộc + tối đa 5 ảnh (lưu Drive); nộp xong gửi về DVBH (tự gửi lại nếu lỗi). |
+| F4 | Nộp giải trình | KTV | Lý do bắt buộc + tối đa 5 ảnh, mỗi ảnh ≤ 10 MB, chỉ nhận file ảnh (lưu Drive); nộp xong gửi về DVBH (tự gửi lại nếu lỗi). |
 | F5 | Thông báo | Tất cả | Danh sách thông báo vi phạm + thông báo công ty, đánh dấu đã đọc / tất cả; Web Push. |
 | F6 | Báo cáo nhanh | KTV (của mình), Admin (toàn đội / 1 KTV) | Số liệu vi phạm + công việc từ DVBH + tỷ lệ nghi ngờ. |
 | F7 | Quản trị tài khoản | Admin | Duyệt / từ chối / khoá; đặt vai trò Admin / GS khu vực (+ khu vực) / View. |

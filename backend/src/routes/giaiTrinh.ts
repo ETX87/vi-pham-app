@@ -431,8 +431,11 @@ giaiTrinh.post("/vi-pham/:id/anh", async (c) => {
   if (!maKtv || viPham.ky_thuat_vien_ma_ktv !== maKtv) return c.json({ error: "FORBIDDEN" }, 403);
 
   const contentType = c.req.header("Content-Type") ?? "application/octet-stream";
+  // Chi nhan anh (bang chung), toi da 10 MB/anh - khop MAX_ANH_MB o ViPhamDetailScreen.tsx.
+  if (!contentType.toLowerCase().startsWith("image/")) return c.json({ error: "NOT_IMAGE", message: "Chỉ được tải lên file ảnh." }, 415);
   const bytes = await c.req.arrayBuffer();
   if (bytes.byteLength === 0) return c.json({ error: "EMPTY_BODY" }, 400);
+  if (bytes.byteLength > 10 * 1024 * 1024) return c.json({ error: "TOO_LARGE", message: "Ảnh vượt 10 MB." }, 413);
 
   try {
     const ext = contentType.split("/")[1]?.split(";")[0] || "jpg";

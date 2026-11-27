@@ -10,6 +10,8 @@ import { LoaiLoiHelp } from "../components/LoaiLoiHelp";
 import { KetQuaCap1Help } from "../components/KetQuaCap1Help";
 
 const MAX_ANH = 5;
+const MAX_ANH_MB = 10;
+const MAX_ANH_BYTES = MAX_ANH_MB * 1024 * 1024;
 const MAX_CHARS = 1000;
 
 interface DetailResponse {
@@ -40,6 +42,7 @@ export function ViPhamDetailScreen({ id, onBack, onChanged, readOnly }: { id: st
   const [submitResult, setSubmitResult] = useState<{ ok: boolean; dongBoThanhCong?: boolean; error?: string } | null>(null);
   const [showCaseModal, setShowCaseModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadingRef = useRef(false);
 
   function load() {
     setLoading(true);
@@ -54,11 +57,23 @@ export function ViPhamDetailScreen({ id, onBack, onChanged, readOnly }: { id: st
   useEffect(load, [id]);
 
   async function uploadFiles(files: File[]) {
+    // Dang tai lo truoc thi bo qua (keo-tha lan 2 trong luc dang tai tung lam vuot MAX_ANH vi
+    // photos.length trong closure chua kip cap nhat).
+    if (uploadingRef.current) return;
+    const anh = files.filter((f) => !f.type || f.type.startsWith("image/"));
     const remain = MAX_ANH - photos.length;
-    if (remain <= 0) return;
+    if (remain <= 0 || anh.length === 0) return;
+    const quaLon = anh.filter((f) => f.size > MAX_ANH_BYTES);
+    const hopLe = anh.filter((f) => f.size <= MAX_ANH_BYTES);
+    const canhBao: string[] = [];
+    if (quaLon.length) canhBao.push(`${quaLon.length} ảnh vượt ${MAX_ANH_MB} MB nên không tải lên.`);
+    if (hopLe.length > remain) canhBao.push(`Chỉ được đính kèm tối đa ${MAX_ANH} ảnh - đã bỏ ${hopLe.length - remain} ảnh thừa.`);
+    if (canhBao.length) alert(canhBao.join("\n"));
+    if (hopLe.length === 0) return;
+    uploadingRef.current = true;
     setUploading(true);
     try {
-      for (const file of files.slice(0, remain)) {
+      for (const file of hopLe.slice(0, remain)) {
         const bytes = await file.arrayBuffer();
         const { thumbnailUrl } = await api.postBinary<{ thumbnailUrl: string }>(`/giai-trinh/vi-pham/${id}/anh`, bytes, file.type || "image/jpeg");
         setPhotos((prev) => [...prev, { localId: crypto.randomUUID(), thumbnailUrl }]);
@@ -67,6 +82,7 @@ export function ViPhamDetailScreen({ id, onBack, onChanged, readOnly }: { id: st
       const message = err instanceof ApiError ? err.detail ?? err.code ?? "Tải ảnh thất bại." : "Tải ảnh thất bại.";
       alert(message);
     } finally {
+      uploadingRef.current = false;
       setUploading(false);
     }
   }
@@ -130,7 +146,7 @@ export function ViPhamDetailScreen({ id, onBack, onChanged, readOnly }: { id: st
         </div>
 
         <div className="field">
-          <label className="field-label">Đính kèm hình ảnh (tối đa {MAX_ANH} ảnh)</label>
+          <label className="field-label">Đính kèm hình ảnh bằng chứng (tối đa {MAX_ANH} ảnh, mỗi ảnh ≤ {MAX_ANH_MB} MB)</label>
           {photos.length < MAX_ANH && (
             <div
               className={`dropzone ${dragOver ? "drag-over" : ""}`}
@@ -143,7 +159,7 @@ export function ViPhamDetailScreen({ id, onBack, onChanged, readOnly }: { id: st
               onDrop={(e) => {
                 e.preventDefault();
                 setDragOver(false);
-                uploadFiles(Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/")));
+                uploadFiles(Array.from(e.dataTransfer.files));
               }}
             >
               <div className="dropzone-icon">
