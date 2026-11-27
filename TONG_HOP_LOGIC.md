@@ -22,9 +22,12 @@
 
 ## 3. Vòng đời 1 vi phạm
 
-1. **Nghi ngờ mới** (từ DVBH): tạo dòng vi phạm, cố gắng **khớp KTV** theo tên / mã trong danh bạ.
+1. **Nghi ngờ mới** (từ DVBH): tạo dòng vi phạm, cố gắng **khớp KTV** với danh bạ:
+   - Ưu tiên **mã KTV trong ngoặc** ở đầu tên DVBH gửi (vd `(phongld.mn1) … - NS-3296` → `phongld.mn1`), so với mã danh bạ, không phân biệt hoa/thường.
+   - Không có mã / mã không có trong danh bạ → so tên (bỏ dấu, bỏ hoa/thường, bỏ đuôi ` - NS-xxxx`). Phải khớp đúng 1 KTV.
    - Khớp được → gán KTV, gửi thông báo trong app + Web Push.
    - Không khớp → vào hàng đợi **"Chưa xác định KTV"** cho Admin gán tay hoặc bỏ qua (`/api/admin/vi-pham/...`).
+   - **Cron mỗi đầu giờ** khớp lại toàn bộ hàng đợi này (trừ dòng Admin đã bỏ qua): gán được thì gán; vi phạm QC chưa chốt thì báo KTV.
 2. **KTV giải trình**: viết lý do + đính kèm tối đa **5 ảnh** (lưu Drive) → nộp 1 lần; giải trình gửi về DVBH.
 3. **CSKH kết luận cấp 1** (`ket_qua_cap_1`: vd "Lỗi không liên hệ được", "Lỗi sai báo cáo"…) — danh mục có mô tả, Admin quản lý.
 4. **QC chốt cấp 2** (từ DVBH): **xác nhận vi phạm** hoặc **bỏ (không tính)** → chi tiết hiện banner kết quả QC (đỏ / xanh) kèm người + giờ chốt.

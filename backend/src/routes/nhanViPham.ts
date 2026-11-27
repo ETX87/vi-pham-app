@@ -64,16 +64,76 @@ interface KtvLienHeRow {
   email_dang_nhap: string | null;
 }
 
-// Khop "ky_thuat_vien" (ten tho DVBH gui) voi cache ktv_lien_he.ten_hien_thi sau khi chuan hoa
-// (trim/lowercase/bo dau) - khop DUNG 1 dong -> gan ky_thuat_vien_ma_ktv; khop 0 hoac >1 dong -> de
-// trong, roi vao hang doi "Chua xac dinh KTV" cho Admin gan tay (adminViPham.ts).
-async function matchKtvByName(db: D1Database, tenKtv: string | null | undefined): Promise<KtvLienHeRow | null> {
-  const normalizedTarget = normalizeVietnameseName(tenKtv);
-  if (!normalizedTarget) return null;
+// Khop "ky_thuat_vien" (chuoi tho DVBH gui, vd "(phongld.mn1) CTV Tien Giang - Le Dang Phong - NS-3296")
+// voi danh ba ktv_lien_he. Uu tien 1: MA KTV trong ngoac dau chuoi == ktv_lien_he.ma_ktv (khong phan
+// biet hoa thuong). Uu tien 2 (khong co ma / ma khong co trong danh ba): so ten da chuan hoa, bo duoi
+// " - NS-xxxx" ca 2 phia. Khop DUNG 1 dong -> gan; 0 hoac >1 dong -> hang doi "Chua xac dinh KTV".
+// (2026-11-27: tu 17/11 DVBH them duoi " - NS-xxxx" vao ten KTV -> so nguyen chuoi truot het, 94 vi pham
+// khong toi tay KTV - vi vay doi sang bat theo ma KTV.)
+const MA_KTV_TRONG_NGOAC_RE = /^\s*\(([^)]+)\)/;
+const DUOI_MA_NS_RE = /\s*-\s*NS-\d+\s*$/i;
 
+export function tachMaKtv(tenKtv: string | null | undefined): string | null {
+  const m = tenKtv?.match(MA_KTV_TRONG_NGOAC_RE);
+  return m ? m[1].trim().toLowerCase() || null : null;
+}
+
+function chuanHoaTenKtv(ten: string | null | undefined): string {
+  return normalizeVietnameseName((ten ?? "").replace(DUOI_MA_NS_RE, ""));
+}
+
+export function khopKtvTrongDanhBa(danhBa: KtvLienHeRow[], tenKtv: string | null | undefined): KtvLienHeRow | null {
+  const ma = tachMaKtv(tenKtv);
+  if (ma) {
+    const theoMa = danhBa.filter((r) => r.ma_ktv.trim().toLowerCase() === ma);
+    if (theoMa.length === 1) return theoMa[0];
+  }
+  const target = chuanHoaTenKtv(tenKtv);
+  if (!target) return null;
+  const theoTen = danhBa.filter((r) => chuanHoaTenKtv(r.ten_hien_thi) === target);
+  return theoTen.length === 1 ? theoTen[0] : null;
+}
+
+async function docDanhBaKtv(db: D1Database): Promise<KtvLienHeRow[]> {
   const { results } = await db.prepare("SELECT ma_ktv, ten_hien_thi, email_dang_nhap FROM ktv_lien_he").all<KtvLienHeRow>();
-  const matches = results.filter((r) => normalizeVietnameseName(r.ten_hien_thi) === normalizedTarget);
-  return matches.length === 1 ? matches[0] : null;
+  return results;
+}
+
+async function matchKtvByName(db: D1Database, tenKtv: string | null | undefined): Promise<KtvLienHeRow | null> {
+  if (!tenKtv?.trim()) return null;
+  return khopKtvTrongDanhBa(await docDanhBaKtv(db), tenKtv);
+}
+
+/** Cron moi dau gio (index.ts scheduled()): khop lai cac vi pham dang o hang doi "Chua xac dinh KTV"
+ * (ky_thuat_vien_ma_ktv NULL, Admin chua bo qua) - danh ba / luat khop doi thi tu gan bu, khong can Admin
+ * gan tay. Gan duoc + QC CHUA chot/bo cap 2 -> gui thong bao trong app + push cho KTV. */
+export async function ganLaiViPhamChuaXacDinh(env: Env): Promise<{ tong: number; gan: number }> {
+  const { results: choGan } = await env.DB.prepare(
+    "SELECT id, loai_loi, case_id, ky_thuat_vien_ten, chot_bo_cap_2 FROM vi_pham WHERE ky_thuat_vien_ma_ktv IS NULL AND bo_qua_gan_ktv = 0 AND ky_thuat_vien_ten IS NOT NULL LIMIT 1000",
+  ).all<{ id: string; loai_loi: string; case_id: string | null; ky_thuat_vien_ten: string; chot_bo_cap_2: number | null }>();
+  if (choGan.length === 0) return { tong: 0, gan: 0 };
+
+  const danhBa = await docDanhBaKtv(env.DB);
+  const ganDuoc: { vp: (typeof choGan)[number]; ktv: KtvLienHeRow }[] = [];
+  for (const vp of choGan) {
+    const ktv = khopKtvTrongDanhBa(danhBa, vp.ky_thuat_vien_ten);
+    if (ktv) ganDuoc.push({ vp, ktv });
+  }
+  if (ganDuoc.length === 0) return { tong: choGan.length, gan: 0 };
+
+  const stmt = env.DB.prepare("UPDATE vi_pham SET ky_thuat_vien_ma_ktv = ? WHERE id = ? AND ky_thuat_vien_ma_ktv IS NULL");
+  await env.DB.batch(ganDuoc.map(({ vp, ktv }) => stmt.bind(ktv.ma_ktv, vp.id)));
+
+  for (const { vp, ktv } of ganDuoc) {
+    if (vp.chot_bo_cap_2 != null) continue; // QC da chot/bo -> khong bao "can giai trinh" nua.
+    try {
+      await notifyKtvViPham(env, ktv, { id: vp.id, loai_loi: vp.loai_loi, case_id: vp.case_id });
+    } catch (err) {
+      console.error(`[ganLaiViPhamChuaXacDinh] bao KTV ${ktv.ma_ktv} vi_pham=${vp.id} loi:`, err);
+    }
+  }
+  console.log(`[ganLaiViPhamChuaXacDinh] gan bu ${ganDuoc.length}/${choGan.length} vi pham`);
+  return { tong: choGan.length, gan: ganDuoc.length };
 }
 
 async function getEmailDangNhap(db: D1Database, maKtv: string | null): Promise<string | null> {

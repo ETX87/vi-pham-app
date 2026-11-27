@@ -3,6 +3,16 @@
 > Mỗi đợt làm việc 1 mục, **mới nhất ở trên**: ngày, phiên bản, yêu cầu, đã làm gì, kiểm thử gì, việc còn dở. Chỉ ghi thêm, không xoá mục cũ.
 > Không ghi tài khoản, mật khẩu, khoá hay mô tả lỗ hổng bảo mật vào file này (repo có thể công khai).
 
+## 27/11/2026 — Khớp KTV theo mã KTV (sửa lỗi vi phạm không tới tay KTV)
+
+**Yêu cầu (nguyên văn):** "trên dvbh có nhiều ca cần ktv giải trình nhưng trên app ktv lại không hiện ca cần giải trình là sao" → "gắn lại rồi sửa logic để bắt theo id ktv".
+
+**Nguyên nhân:** từ 17/11/2026 tên KTV DVBH gửi sang có thêm đuôi ` - NS-xxxx` (vd `(phongld.mn1) CTV Tiền Giang - Lê Đăng Phong - NS-3296`), trong khi danh bạ không có đuôi → so nguyên chuỗi tên trượt → 94 vi phạm (17–26/11) nằm ở "Chưa xác định KTV", KTV không thấy.
+
+**Đã làm:** `routes/nhanViPham.ts` — khớp KTV ưu tiên mã trong ngoặc, dự phòng so tên đã bỏ đuôi NS; thêm `ganLaiViPhamChuaXacDinh()` chạy trong cron mỗi đầu giờ (`index.ts`) để gán bù hàng đợi và báo KTV (chỉ vi phạm QC chưa chốt).
+
+**Kiểm thử:** typecheck + build 0 lỗi; trước khi sửa đã đối chiếu trên DB thật: cả 94 vi phạm đều khớp đúng 1 KTV theo mã. Sau deploy kiểm lại hàng đợi sau lượt cron đầu tiên.
+
 ## 24/11/2026 — Cửa sổ thông tin eOffice (popup Giám đốc)
 
 **Yêu cầu (nguyên văn):** "làm luôn cho toàn bộ hệ thống app dvbh: đặt lk, đổi trả, ông thợ, vi phạm, tiếp nhận..." (+ "thêm cả muahang", "cả ccdc") — tài liệu "API Cửa sổ thông tin — dành cho app ngoài (ETX87)".

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "./types";
 import authRoutes from "./routes/auth";
-import nhanViPhamRoutes from "./routes/nhanViPham";
+import nhanViPhamRoutes, { ganLaiViPhamChuaXacDinh } from "./routes/nhanViPham";
 import giaiTrinhRoutes from "./routes/giaiTrinh";
 import adminViPhamRoutes from "./routes/adminViPham";
 import adminUsersRoutes from "./routes/adminUsers";
@@ -56,5 +56,7 @@ export default {
   // duoc ve DVBH - danh ba KTV KHONG nam trong cron nay (xem ghi chu tren dau file).
   scheduled: async (_event: ScheduledEvent, env: Env, ctx: ExecutionContext) => {
     ctx.waitUntil(retryPendingGiaiTrinh(env, env.DB));
+    // Gan bu KTV cho vi pham "Chua xac dinh KTV" (khop theo ma KTV trong ngoac - routes/nhanViPham.ts).
+    ctx.waitUntil(ganLaiViPhamChuaXacDinh(env).catch((err) => console.error("[cron] ganLaiViPhamChuaXacDinh loi:", err)));
   },
 };
